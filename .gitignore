@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.js.map
+data/
+
+# Old web directory (locked native binaries, safe to delete manually)
+/web/

@@ -1,0 +1,20 @@
+{
+  "name": "code-check-skill",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @code-check/api dev",
+    "dev:web": "pnpm --filter @code-check/web dev",
+    "build": "pnpm -r build",
+    "build:core": "pnpm --filter @code-check/core build",
+    "build:api": "pnpm --filter @code-check/api build",
+    "build:web": "pnpm --filter @code-check/web build",
+    "start": "pnpm --filter @code-check/api start",
+    "test:core": "pnpm --filter @code-check/core-test test",
+    "test:core:watch": "pnpm --filter @code-check/core-test test:watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "AI-powered code review tool with modular architecture"
+}
