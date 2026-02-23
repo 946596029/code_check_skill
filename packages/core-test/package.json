@@ -8,7 +8,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@code-check/core": "workspace:*"
+    "@code-check/core": "workspace:*",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",

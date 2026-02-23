@@ -1,51 +1,57 @@
 # TODO
+- [] 需要考虑一下链式接口的扩展问题，设计问题
+
+## 使用问题
+- [] resource-doc workflow 需要实现的检查规则
+    - [] 语法检查
+        - [x] 元信息检查，并解析元信息
+        - [x] 一级目录检查
+            - [x] 一级目录标题与元信息`资源名称`一致
+            - [x] 一级目录下描述与元信息`资源描述`一致
+        - [] 二级目录 Example Usage 检查
+            - [x] 检查结构
+                - 单独默认样例
+                - 多个样例，但每个样例需要伴随一个三级标题
+            - [x] 二级目录跟随描述为固定语句
+        - [] 二级目录 Argument Reference 检查
+            - [x] 检查二级目录结构，是否为 (list paragraph?)+
+            - [x] 二级目录跟随描述为固定语句
+            - [x] 检查每个 list item 格式是否为 Argument 标准格式
+                - "* `arg_name` - (Optional, Int) Specifies xxx"
+        - [] 二级目录 Attributes Reference 检查
+            - [x] 检查二级目录结构，是否为 (list paragraph?)+
+            - [x] 二级目录跟随描述为固定语句
+            - [x] 检查每个 list item 格式是否为 Attribute 标准格式
+                - "* `attr_name` - xxx"
+        - [] 二级目录 Import 检查
+        - [] 二级目录 TimeOut 检查
+        - [] 格式规则，明天将这部分修改正确
+            - [] 对于所有的数字，除了被 ** 包围的，和时间戳，其他都要使用 `` 强调，并采取千分位标记法
+            - [] 对于一些专有名词，需要大写, 比如 IP
+            - [] 对于一些特殊表述，有固定的格式
+        
+    - [] 语义检查
+        - [] 前置动作，需要支持解析 Go 语言文件，来获取 schema 信息
+        
 
 ## 设计目标
-- [x] 先支持手工编写规则，将规则编织到workflow中
-    - 这里系统提供哪些能够便于规则的开发
-        - [x] rule
-            - [x] prompt rule
-            - [x] code rule
-        - [] feature
-            - [x] grep
-            - [x] ast
-            - [] context
-2. 在 web 系统支持新增 workflow
-    支持新增 workflow
-    支持为 workflow 新增 rule，feature
-    支持在线调试，测试
-    支持 workflow 在线运行
-3. 支持 workflow 包含 workflow
-    进行多文件关联测试
+- [x] 先打通一个 workflow, 针对 Markdown 文件走通一次检查流程  **重点**
+- [x] 修改入口目标，使其能够进行测试
+    - 1. 打开到 package 目录下
+    - 2. pnpm cli -- resource-doc ${file_path}
 
-4. 使用图形化编织规则，让规则可以更容易编写 
-    - 非核心需求，原型阶段不实现，规则保持程序编写
-
-
-## 要做的事情
-- [] 针对 Markdown 文件走通一次检查流程  **重点**
-    - [x] 准备一个 Markdown 测试文件
-    - [x] 准备几个检查规则
-    - [x] 单独测试后端流程
-        - 使用 vitest 来编写单元测试
-        - 使用 pnpm test:${module_name} 来运行单元测试
-    - [] 测试前端功能
-- [] 针对检查规则进行优化
-    - [x] 引入字符串搜索工具
-    - [x] 引入AST解析工具
-    - [x] 根据特征进行检索
-    - [] 检索后获取相关代码，只对局域代码进行检查
-        - Rule 细节实现
-- [] 使用测试函数测试
-    - [] 可以通过描述意图
-        - [] AI 生成测试函数
-        - [] AI 生成测试样例
-    - [] 可在平台测试 测试套件
-    - [] 固化测试套件
+## 测试命令
+- 查看支持的工作流 `code-check list workflow`
+- 使用某个工作流检查资源 `code-check ${workflow_name} ${resource_name}`
+- 获取某个 markdown 文档的 ast 结构 `npx tsx .../scripts/parse-markdown.ts`
 
 ## 设计思考
-1. 在 workflow 中，预处理环节用于执行非规则的信息
-    code 在此处被转换为 AST
-2. Rule 需要添加 features 属性，来对 AST 进行探测，以判断自己是否执行
-3. 我想到可以添加树形控制，但是我想到一个原则
-    如果这个功能不影响核心功能的实现，就可以不要，先进行核心功能的实验
+1. 先进行核心功能的实现
+2. 一个能不影响核心功能的实现就可以不做
+3. 现在只实现 cmd 的交互，通过命令来执行一个具体的检查，解决问题才是关键
+
+## 技术细节
+1. ast pattern 负责结构匹配
+2. line pattern 负责文本匹配
+3. 实现 Rule 树形子规则控制
+4. RuleContext 采用链式查找，解决合并查询问题

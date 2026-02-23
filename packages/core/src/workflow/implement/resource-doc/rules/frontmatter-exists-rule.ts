@@ -1,52 +1,89 @@
 import type { MarkdownNode } from "../../../../tools/ast-parser/markdown";
-import { CodeRule } from "../../../types/rule/code-rule";
-import { RuleCheckResult } from "../../../types/rule/rule";
+import { MarkdownParser } from "../../../../tools/ast-parser/markdown";
+import { Rule, RuleCheckResult, RuleMeta } from "../../../types/rule/rule";
+import { Context } from "../../../context/context";
+import {
+    CTX_EXPECTED_DESCRIPTION,
+    CTX_FRONTMATTER,
+    CTX_RESOURCE_NAME,
+} from "../context-keys";
 
-/**
- * Rule 1: frontmatter-exists
- * Front matter block must exist at the start of the document.
- *
- * Detect phase: check whether children[0] is a "frontmatter" node.
- *               (The parser always inserts frontmatter as the first child.)
- * Check  phase: if the first child is not frontmatter, report an error.
- */
-export class FrontmatterExistsRule extends CodeRule {
+const META: RuleMeta = {
+    name: "frontmatter-exists",
+    description:
+        "Front matter block must exist at the start of the document",
+    messages: {
+        missing: "Missing front matter block",
+    },
+};
+
+export class FrontmatterExistsRule extends Rule {
+    private readonly parser = new MarkdownParser();
+
     constructor() {
-        super(
-            "frontmatter-exists",
-            "Front matter block must exist at the start of the document",
-            null,
-            "Missing front matter block",
-            []
-        );
+        super(META, "code");
     }
 
-    /**
-     * Orchestrate detect → check flow.
-     *
-     * 1. Detect: the parser guarantees frontmatter is always children[0],
-     *            so we check the first child directly (O(1)).
-     * 2. Check:  if the first child is not a frontmatter node, call check().
-     */
-    public async test(code: string, ast?: unknown): Promise<RuleCheckResult[]> {
+    public async test(
+        code: string,
+        ast?: unknown,
+        parentCtx?: Context
+    ): Promise<RuleCheckResult[]> {
         if (!ast) {
-            const result = await this.check(code);
-            return result ? [result] : [];
+            return [this.fail("missing", code)];
         }
 
         const doc = ast as MarkdownNode;
 
-        // Detect: frontmatter is always the first child of the document
-        if (doc.children[0]?.type !== "frontmatter") {
-            // Check: first child is not frontmatter → report error
-            const result = await this.check(code);
-            return result ? [result] : [];
+        if (this.parser.hasChild(
+            doc, (n) => n.type === "frontmatter", "first"
+        )) {
+            this.storeFrontmatterInContext(doc, parentCtx);
+            return [];
         }
 
-        return [];
+        const result = this.fail("missing", code);
+
+        if (this.children.length > 0) {
+            const ctx = parentCtx
+                ? parentCtx.createChild()
+                : new Context();
+            result.children = await this.executeChildren(code, ast, ctx);
+        }
+
+        return [result];
     }
 
-    protected async check(code: string): Promise<RuleCheckResult | null> {
-        return new RuleCheckResult(false, this.errorMessage, code, code);
+    private storeFrontmatterInContext(
+        doc: MarkdownNode,
+        ctx?: Context
+    ): void {
+        if (!ctx) return;
+
+        const frontmatter = this.parser.getFrontmatter(doc);
+        if (!frontmatter) return;
+
+        ctx.set(CTX_FRONTMATTER, frontmatter);
+
+        const resourceName = this.extractResourceName(frontmatter);
+        if (resourceName) {
+            ctx.set(CTX_RESOURCE_NAME, resourceName);
+        }
+
+        const desc = this.normalizeDescription(frontmatter.description);
+        ctx.set(CTX_EXPECTED_DESCRIPTION, desc ?? "");
+    }
+
+    private extractResourceName(fm: Record<string, unknown>): string | null {
+        const pageTitle = fm.page_title;
+        if (typeof pageTitle !== "string") return null;
+        const match = pageTitle.match(/:\s*(.+)$/);
+        return match ? match[1].trim() : pageTitle.trim();
+    }
+
+    private normalizeDescription(desc: unknown): string | null {
+        if (desc == null) return null;
+        const s = typeof desc === "string" ? desc : String(desc);
+        return s.replace(/\r\n/g, "\n").trim();
     }
 }

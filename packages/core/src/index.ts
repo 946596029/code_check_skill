@@ -1,36 +1,122 @@
-// Rules
-export { Rule, RuleCheckResult, RuleType } from "./workflow/types/rule/rule";
-export { PromptRule, DynamicPromptRule } from "./workflow/types/rule/prompt-rule";
-export { CodeRule } from "./workflow/types/rule/code-rule";
+// ── Facade (high-level API) ──
+export { CodeChecker } from "./facade";
+export type {
+    CodeCheckerConfig,
+    LlmConfig,
+    CheckOptions,
+    CheckReport,
+    WorkflowInfo,
+} from "./facade";
 
-// Features
-export { Feature, FeatureMatch, FeatureLanguage } from "./workflow/types/feature/feature";
-export { TextGrepFeature } from "./workflow/types/feature/concrete/text-grep-feature";
-export { AstMatcherFeature, NodePredicate } from "./workflow/types/feature/concrete/ast-matcher-feature";
+// ── Rules ──
+export { Rule, RuleCheckResult } from "./workflow/types/rule/rule";
+export type { RuleMeta, MessageTemplate } from "./workflow/types/rule/rule";
 
-// Workflow
+
+// ── Workflow ──
 export { Workflow, LifeCycle } from "./workflow/workflow";
+export type { RuleResult, OnRuleComplete } from "./workflow/workflow";
 export { ResourceDocWorkflow } from "./workflow/implement/resource-doc/resource-doc-workflow";
 export {
     FrontmatterExistsRule,
+    H1StructureRule,
+    ExampleUsageStructureRule,
+    ArgumentDescriptionFormatRule,
     RESOURCE_DOC_RULES,
 } from "./workflow/implement/resource-doc/rules";
 
-// Database
-export { getDatabase, persistDatabase, setDatabasePath } from "./db/database";
+// ── Description Format Spec ──
+export {
+    getFormatSpec,
+    DESCRIPTION_INTENTS,
+} from "./workflow/implement/resource-doc/rules/argument-reference-structure";
+export type {
+    DescriptionIntent,
+    DescriptionFormatSpec,
+    FormatValidationResult,
+} from "./workflow/implement/resource-doc/rules/argument-reference-structure";
+export { DescriptionIntentClassifier } from "./workflow/implement/resource-doc/rules/argument-reference-structure";
 
-// LLM
+// ── LLM ──
 export { createQwenModel } from "./llm/model";
 
-// Context
-export { GlobalContext, CheckContext } from "./workflow/context/context";
+// ── Structured LLM Calling ──
+export { StructuredCaller, extractJson } from "./tools/llm";
+export type {
+    StructuredCallerOptions,
+    StructuredCallResult,
+    StructuredCallSuccess,
+    StructuredCallFailure,
+} from "./tools/llm";
 
-// AST Parsers
+// ── Context ──
+export { Context } from "./workflow/context/context";
+
+// ── AST Parsers ──
 export { MarkdownParser } from "./tools/ast-parser/markdown";
+export { GoParser, TerraformSchemaExtractor } from "./tools/ast-parser/go";
+export type {
+    SchemaField,
+    SchemaFieldType,
+    ResourceSchema,
+} from "./tools/ast-parser/go";
 
-// Text Search
+// ── Text Search ──
 export { RegexGrep } from "./tools/text-grep";
 export type { RegexMatch, RegexGrepOptions } from "./tools/text-grep";
+
+
+// ── Node Pattern ──
+export { NodePattern } from "./tools/node-pattern";
+export type {
+    NodeMatchResult,
+    NodePatternMatch,
+    NodeMatchFailure,
+} from "./tools/node-pattern";
+export type {
+    NodeMatcher,
+    GroupMatcher,
+    NodeMatchElement,
+    Quantifier,
+} from "./tools/node-pattern";
+export { isGroupMatcher } from "./tools/node-pattern";
+export {
+    nodeType,
+    heading,
+    codeBlock,
+    list,
+    nodeWhere,
+    anyNode,
+    optionalNode,
+    zeroOrMore,
+    oneOrMore,
+    tagged,
+    group,
+    optionalGroup,
+    zeroOrMoreGroup,
+    oneOrMoreGroup,
+} from "./tools/node-pattern";
+
+// ── Line Pattern ──
+export { LinePattern } from "./tools/line-pattern";
+export type {
+    LineMatchResult,
+    LineMatchSuccess,
+    LineMatchFailure,
+} from "./tools/line-pattern";
+export type { Segment, SegmentMatchResult } from "./tools/line-pattern";
+export { matchSegment } from "./tools/line-pattern";
+export {
+    literal,
+    backticked,
+    parenthesized,
+    csvParenthesized,
+    spaces,
+    keyword,
+    rest,
+    optional,
+} from "./tools/line-pattern";
+export type { CsvSlot } from "./tools/line-pattern";
 export type {
     MarkdownNode,
     MarkdownNodeType,

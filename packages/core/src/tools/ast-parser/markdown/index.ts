@@ -1,41 +1,24 @@
 /**
  * Markdown AST Parser Module
  *
- * This module provides a CommonMark compliant markdown parser that converts
- * markdown text into an Abstract Syntax Tree (AST) for analysis and manipulation.
- *
- * The parser uses commonmark.js, the official reference implementation of the
- * CommonMark specification.
+ * CommonMark compliant parser that converts markdown text into an AST.
  *
  * @example
  * ```typescript
  * import { MarkdownParser } from "@code-check/core";
  *
  * const parser = new MarkdownParser();
- * const ast = parser.parse(`
- * # Hello World
+ * const doc = parser.parse("# Hello\n\nParagraph text.");
  *
- * This is a **paragraph** with [a link](https://example.com).
+ * // Semantic queries
+ * const body    = parser.getBodyChildren(doc);
+ * const section = parser.getSection(doc, 2, "Example Usage");
+ * const next    = parser.getNextSibling(doc, heading, n => n.type === "paragraph");
  *
- * \`\`\`typescript
- * const x = 1;
- * \`\`\`
- * `);
- *
- * // Get all headings
- * const headings = parser.getHeadings(ast);
- * console.log(headings); // [{ level: 1, text: "Hello World", node: {...} }]
- *
- * // Get all code blocks
- * const codeBlocks = parser.getCodeBlocks(ast);
- * console.log(codeBlocks); // [{ language: "typescript", code: "const x = 1;\n", node: {...} }]
- *
- * // Walk the AST
- * parser.walk(ast, (node, entering) => {
- *     if (entering && node.type === "link") {
- *         console.log(`Found link: ${node.destination}`);
- *     }
- * });
+ * // Convenience accessors
+ * const headings   = parser.getHeadings(doc);
+ * const codeBlocks = parser.getCodeBlocks(doc);
+ * const fm         = parser.getFrontmatter(doc);
  * ```
  *
  * @module ast-parser/markdown

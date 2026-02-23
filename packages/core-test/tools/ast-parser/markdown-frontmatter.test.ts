@@ -210,4 +210,86 @@ describe("MarkdownParser - Frontmatter Support", () => {
       expect(visited[1]).toBe("frontmatter");
     });
   });
+
+  describe("getNodeText()", () => {
+    const MD = [
+      "---",               // line 1
+      "title: Demo",       // line 2
+      "---",               // line 3
+      "",                  // line 4
+      "# Heading",         // line 5
+      "",                  // line 6
+      "Intro paragraph.",  // line 7
+      "",                  // line 8
+      "* `foo` - desc1",   // line 9
+      "* `bar` - desc2",   // line 10
+      "",                  // line 11
+      "## Sub",            // line 12
+    ].join("\n");
+
+    it("should return the source lines for a heading node", () => {
+      const parser = new MarkdownParser();
+      const ast = parser.parse(MD);
+      const headings = parser.findByType(ast, "heading");
+      const h1 = headings.find((h) => h.level === 1)!;
+
+      const result = parser.getNodeText(MD, h1);
+      expect(result).not.toBeNull();
+      expect(result!.startLine).toBe(5);
+      expect(result!.lines).toEqual(["# Heading"]);
+    });
+
+    it("should return the source lines for a list node spanning multiple lines", () => {
+      const parser = new MarkdownParser();
+      const ast = parser.parse(MD);
+      const lists = parser.findByType(ast, "list");
+      expect(lists.length).toBeGreaterThan(0);
+
+      const result = parser.getNodeText(MD, lists[0]);
+      expect(result).not.toBeNull();
+      expect(result!.startLine).toBe(9);
+      expect(result!.lines).toEqual([
+        "* `foo` - desc1",
+        "* `bar` - desc2",
+      ]);
+    });
+
+    it("should return lines for individual list items", () => {
+      const parser = new MarkdownParser();
+      const ast = parser.parse(MD);
+      const lists = parser.findByType(ast, "list");
+      const items = lists[0].children.filter((c) => c.type === "item");
+
+      const first = parser.getNodeText(MD, items[0]);
+      expect(first).not.toBeNull();
+      expect(first!.startLine).toBe(9);
+      expect(first!.lines[0]).toBe("* `foo` - desc1");
+
+      const second = parser.getNodeText(MD, items[1]);
+      expect(second).not.toBeNull();
+      expect(second!.startLine).toBe(10);
+      expect(second!.lines[0]).toBe("* `bar` - desc2");
+    });
+
+    it("should return null for a node without sourceRange", () => {
+      const parser = new MarkdownParser();
+      const node: MarkdownNode = {
+        type: "text",
+        literal: "hello",
+        destination: null,
+        title: null,
+        info: null,
+        level: null,
+        listType: null,
+        listTight: null,
+        listStart: null,
+        listDelimiter: null,
+        data: null,
+        sourceRange: null,
+        children: [],
+      };
+
+      expect(parser.getNodeText(MD, node)).toBeNull();
+    });
+  });
 });

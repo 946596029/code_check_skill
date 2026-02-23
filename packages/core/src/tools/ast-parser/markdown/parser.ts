@@ -108,17 +108,23 @@ export class MarkdownParser {
     public parse(markdown: string): MarkdownNode {
         let frontmatterNode: MarkdownNode | null = null;
         let body = markdown;
+        let lineOffset = 0;
 
         if (this.enableFrontmatter) {
             const extracted = this.extractFrontmatter(markdown);
             if (extracted) {
                 frontmatterNode = extracted.node;
                 body = extracted.body;
+                lineOffset = extracted.node.sourceRange!.end.line;
             }
         }
 
         const rawAst = this.parser.parse(body);
         const document = convertNode(rawAst);
+
+        if (lineOffset > 0) {
+            this.offsetSourceRanges(document, lineOffset);
+        }
 
         if (frontmatterNode) {
             document.children.unshift(frontmatterNode);
@@ -330,6 +336,234 @@ export class MarkdownParser {
         return node?.data ?? null;
     }
 
+    // ── Semantic query helpers ──
+
+    /**
+     * Return the document body children, excluding the frontmatter node.
+     */
+    public getBodyChildren(doc: MarkdownNode): MarkdownNode[] {
+        return doc.children.filter((c) => c.type !== "frontmatter");
+    }
+
+    /**
+     * Extract a heading section's content nodes.
+     *
+     * Finds the first heading at `level` whose text matches `title`,
+     * then returns all sibling nodes from that heading up to (but not
+     * including) the next heading at the same or higher level.
+     *
+     * @returns The content nodes, or null if the heading is not found.
+     */
+    public getSection(
+        doc: MarkdownNode,
+        level: number,
+        title: string
+    ): MarkdownNode[] | null {
+        const body = this.getBodyChildren(doc);
+        const idx = body.findIndex(
+            (c) =>
+                c.type === "heading" &&
+                (c.level ?? 1) === level &&
+                this.getTextContent(c).trim() === title
+        );
+        if (idx < 0) return null;
+
+        const start = idx + 1;
+        let end = body.length;
+        for (let i = start; i < body.length; i++) {
+            if (body[i].type === "heading" && (body[i].level ?? 1) <= level) {
+                end = i;
+                break;
+            }
+        }
+        return body.slice(start, end);
+    }
+
+    /**
+     * Text-line variant of getSection for rules that need raw-line
+     * processing (e.g. regex-based bullet validation).
+     *
+     * @returns The lines within the section and the 1-based start line
+     *          number, or null if the heading is not found.
+     */
+    public getSectionText(
+        source: string,
+        level: number,
+        title: string
+    ): { lines: string[]; startLine: number } | null {
+        const prefix = "#".repeat(level);
+        const heading = `${prefix} ${title}`;
+        const allLines = source.split(/\r?\n/);
+
+        const headingIdx = allLines.findIndex(
+            (l) => l.trim() === heading
+        );
+        if (headingIdx < 0) return null;
+
+        const sameOrHigher = new RegExp(`^#{1,${level}}\\s+`);
+        let endIdx = allLines.length;
+        for (let i = headingIdx + 1; i < allLines.length; i++) {
+            if (sameOrHigher.test(allLines[i].trim())) {
+                endIdx = i;
+                break;
+            }
+        }
+
+        return {
+            lines: allLines.slice(headingIdx + 1, endIdx),
+            startLine: headingIdx + 2,
+        };
+    }
+
+    /**
+     * Extract the original source lines that correspond to an AST node,
+     * using its `sourceRange`.
+     *
+     * Returns the same shape as `getSectionText` so that rules can switch
+     * seamlessly between section-level and node-level text processing.
+     *
+     * @param source - The full markdown source text
+     * @param node   - An AST node with a non-null `sourceRange`
+     * @returns The source lines spanning the node and the 1-based start
+     *          line number, or null if the node has no `sourceRange`.
+     */
+    public getNodeText(
+        source: string,
+        node: MarkdownNode
+    ): { lines: string[]; startLine: number } | null {
+        const range = node.sourceRange;
+        if (!range) return null;
+
+        const allLines = source.split(/\r?\n/);
+        const startIdx = range.start.line - 1;
+        const endIdx = range.end.line - 1;
+
+        if (startIdx < 0 || endIdx >= allLines.length || startIdx > endIdx) {
+            return null;
+        }
+
+        return {
+            lines: allLines.slice(startIdx, endIdx + 1),
+            startLine: range.start.line,
+        };
+    }
+
+    /**
+     * Get the logical text lines of a node by walking its AST.
+     *
+     * Unlike {@link getNodeText}, which returns verbatim source lines,
+     * this method merges soft-break wrapped lines into single logical
+     * lines.  Hard line breaks (trailing double-space or backslash)
+     * still produce separate logical lines.
+     *
+     * For container nodes (list, item, block_quote, document) the
+     * method recurses into block-level children so that each
+     * paragraph / heading yields its own set of logical lines.
+     *
+     * @param source - The full markdown source text
+     * @param node   - An AST node with a non-null `sourceRange`
+     * @returns Logical text lines and the 1-based start line number,
+     *          or null if the node has no `sourceRange`.
+     */
+    public getLogicalLines(
+        source: string,
+        node: MarkdownNode
+    ): { lines: string[]; startLine: number } | null {
+        const range = node.sourceRange;
+        if (!range) return null;
+
+        if (node.type === "paragraph" || node.type === "heading") {
+            const raw = this.getNodeText(source, node);
+            if (!raw) return null;
+            return {
+                lines: this.mergeSoftWraps(raw.lines),
+                startLine: raw.startLine,
+            };
+        }
+
+        if (node.type === "code_block" || node.type === "html_block") {
+            return this.getNodeText(source, node);
+        }
+
+        if (node.type === "thematic_break" || node.type === "frontmatter") {
+            return null;
+        }
+
+        const lines: string[] = [];
+        let startLine = range.start.line;
+        let foundFirst = false;
+
+        for (const child of node.children) {
+            const childResult = this.getLogicalLines(source, child);
+            if (childResult) {
+                if (!foundFirst) {
+                    startLine = childResult.startLine;
+                    foundFirst = true;
+                }
+                lines.push(...childResult.lines);
+            }
+        }
+
+        return { lines, startLine };
+    }
+
+    /**
+     * Find the next sibling of `anchor` within `parent`'s children.
+     *
+     * If a predicate is given, skips siblings that don't match.
+     * Only looks forward (nodes after `anchor`), returns the first match.
+     */
+    public getNextSibling(
+        parent: MarkdownNode,
+        anchor: MarkdownNode,
+        predicate?: (node: MarkdownNode) => boolean
+    ): MarkdownNode | null {
+        const children = parent.type === "document"
+            ? this.getBodyChildren(parent)
+            : parent.children;
+        const idx = children.indexOf(anchor);
+        if (idx < 0 || idx + 1 >= children.length) return null;
+
+        for (let i = idx + 1; i < children.length; i++) {
+            if (!predicate || predicate(children[i])) {
+                return children[i];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Filter nodes by type from a flat node list.
+     */
+    public filterByType(
+        nodes: MarkdownNode[],
+        type: MarkdownNodeType
+    ): MarkdownNode[] {
+        return nodes.filter((n) => n.type === type);
+    }
+
+    /**
+     * Check whether `parent` has a direct child matching the predicate
+     * at the given position.
+     */
+    public hasChild(
+        parent: MarkdownNode,
+        predicate: (node: MarkdownNode) => boolean,
+        position: "first" | "last" | "any" = "any"
+    ): boolean {
+        const children = parent.children;
+        if (children.length === 0) return false;
+
+        switch (position) {
+            case "first":
+                return predicate(children[0]);
+            case "last":
+                return predicate(children[children.length - 1]);
+            case "any":
+                return children.some(predicate);
+        }
+    }
+
     /**
      * Extract front-matter from the beginning of a markdown string.
      *
@@ -395,6 +629,58 @@ export class MarkdownParser {
         );
 
         return { node, body };
+    }
+
+    /**
+     * Shift all sourceRange line numbers in the subtree by `offset`.
+     * Used after frontmatter extraction so that body-node positions
+     * are absolute with respect to the original document.
+     */
+    private offsetSourceRanges(node: MarkdownNode, offset: number): void {
+        if (node.sourceRange) {
+            node.sourceRange.start.line += offset;
+            node.sourceRange.end.line += offset;
+        }
+        for (const child of node.children) {
+            this.offsetSourceRanges(child, offset);
+        }
+    }
+
+    /**
+     * Merge soft-wrapped source lines into logical lines.
+     *
+     * A line ending with two or more trailing spaces or a backslash is
+     * treated as a CommonMark hard line break — the logical line is
+     * split there.  All other intra-paragraph newlines are soft breaks
+     * and are collapsed into a single space.
+     *
+     * Continuation indentation (leading whitespace on lines after the
+     * first) is stripped before merging so that list-item continuation
+     * and block-quote prefixes do not leak into the logical text.
+     */
+    private mergeSoftWraps(rawLines: string[]): string[] {
+        if (rawLines.length <= 1) return [...rawLines];
+
+        const result: string[] = [];
+        let buf = rawLines[0];
+
+        for (let i = 1; i < rawLines.length; i++) {
+            const isHardBreak = / {2,}$/.test(buf) || buf.endsWith("\\");
+            const cont = rawLines[i].replace(/^\s+/, "");
+
+            if (isHardBreak) {
+                result.push(buf.replace(/( {2,}|\\)$/, ""));
+                buf = cont;
+            } else {
+                buf += " " + cont;
+            }
+        }
+
+        if (buf) {
+            result.push(buf);
+        }
+
+        return result;
     }
 
     /**

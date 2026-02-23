@@ -1,4 +1,4 @@
-import { Feature, FeatureMatch } from "../feature/feature";
+import { Context } from "../../context/context";
 
 export class RuleCheckResult {
 
@@ -6,122 +6,154 @@ export class RuleCheckResult {
     public message: string;
     public original: string;
     public suggested: string;
-    public match?: FeatureMatch;
+    public children: RuleCheckResult[];
 
     public constructor(
         success: boolean,
         message: string,
         original: string,
         suggested: string,
-        match?: FeatureMatch
+        children: RuleCheckResult[] = []
     ) {
         this.success = success;
         this.message = message;
         this.original = original;
         this.suggested = suggested;
-        this.match = match;
+        this.children = children;
+    }
+
+    static aggregate(children: RuleCheckResult[]): RuleCheckResult {
+        return new RuleCheckResult(true, "", "", "", children);
+    }
+
+    /**
+     * Aggregate success: this result is successful only when itself
+     * AND all descendant results are successful.
+     */
+    get aggregateSuccess(): boolean {
+        if (!this.success) return false;
+        return this.children.every((c) => c.aggregateSuccess);
+    }
+
+    /**
+     * Collect all failing results across the tree (depth-first).
+     */
+    collectFailures(): RuleCheckResult[] {
+        const failures: RuleCheckResult[] = [];
+        if (!this.success) failures.push(this);
+        for (const child of this.children) {
+            failures.push(...child.collectFailures());
+        }
+        return failures;
     }
 }
 
-export type RuleType = "code" | "prompt";
-
 /**
- * Matcher function type.
- * Receives features, code and AST, returns whether rule should trigger.
+ * Message templates keyed by a short identifier.
+ * Values can be plain strings or functions that accept interpolation args.
  */
-export type MatcherFn = (
-    features: Feature[],
-    code: string,
-    ast: unknown
-) => boolean;
+export type MessageTemplate = string | ((...args: unknown[]) => string);
+
+export interface RuleMeta {
+    name: string;
+    description: string;
+    messages: Record<string, MessageTemplate>;
+}
 
 /**
  * Abstract base class for code checking rules.
+ *
+ * Supports a tree structure: each rule can have child rules.
+ * Subclasses override `test()` to implement their checking logic
+ * and can call `executeChildren()` to dispatch child rules.
+ *
+ * Rule metadata (name, description, error message templates) is
+ * declared separately via `RuleMeta` so that checking logic stays
+ * focused on *what* to check rather than *how to describe* results.
  */
 export abstract class Rule {
 
     public readonly name: string;
     public readonly description: string;
-    public readonly type: RuleType;
-    public readonly features: Feature[];
-    protected readonly matcher: MatcherFn | null;
+    public readonly type: string;
+    public readonly meta: RuleMeta;
+    protected readonly children: Rule[] = [];
 
-    public constructor(
-        name: string,
-        description: string,
-        type: RuleType,
-        features: Feature[] = [],
-        matcher: MatcherFn | null = null
-    ) {
-        this.name = name;
-        this.description = description;
+    public constructor(meta: RuleMeta, type: string = "code") {
+        this.meta = meta;
+        this.name = meta.name;
+        this.description = meta.description;
         this.type = type;
-        this.features = features;
-
-        this.matcher = matcher;
     }
+
+    // ── Child rule management ──
+
+    public addChild(rule: Rule): this {
+        this.children.push(rule);
+        return this;
+    }
+
+    public addChildren(rules: Rule[]): this {
+        this.children.push(...rules);
+        return this;
+    }
+
+    public getChildren(): ReadonlyArray<Rule> {
+        return this.children;
+    }
+
+    // ── Result helpers ──
+
+    /**
+     * Build a failing `RuleCheckResult` from a registered message key.
+     * Extra `args` are forwarded when the template is a function.
+     */
+    protected fail(
+        key: string,
+        original: string,
+        suggested?: string,
+        ...args: unknown[]
+    ): RuleCheckResult {
+        return new RuleCheckResult(
+            false,
+            this.msg(key, ...args),
+            original,
+            suggested ?? original
+        );
+    }
+
+    protected msg(key: string, ...args: unknown[]): string {
+        const tpl = this.meta.messages[key];
+        if (!tpl) return key;
+        return typeof tpl === "function" ? tpl(...args) : tpl;
+    }
+
+    // ── Execution ──
 
     /**
      * Tests the given code against this rule.
+     * Subclasses implement their own checking strategy here.
      */
-    public async test(code: string, ast?: unknown): Promise<RuleCheckResult[]> {
-        const targets = this.resolveCheckTargets(code, ast);
-        if (!targets) return [];
-
-        const results: RuleCheckResult[] = [];
-        for (const { text, match } of targets) {
-            const result = await this.check(text);
-            if (result) {
-                if (match) result.match = match;
-                results.push(result);
-            }
-        }
-        return results;
-    }
-
-    /**
-     * Resolves what code portions to check. Encapsulates feature/matcher logic:
-     * - No features: check entire code
-     * - Features but no AST: skip
-     * - Matcher rejects: skip
-     * - No matches: skip
-     */
-    private resolveCheckTargets(
+    public abstract test(
         code: string,
-        ast?: unknown
-    ): Array<{ text: string; match?: FeatureMatch }> | null {
-        if (this.features.length === 0) {
-            return [{ text: code }];
-        }
-        if (!ast) return null;
-        if (this.matcher && !this.matcher(this.features, code, ast)) return null;
-
-        const matches = this.collectMatches(code, ast);
-        if (matches.length === 0) return null;
-
-        return matches.map((m) => ({ text: m.text, match: m }));
-    }
-
-    private collectMatches(code: string, ast: unknown): FeatureMatch[] {
-        const allMatches: FeatureMatch[] = [];
-        const seen = new Set<string>();
-
-        for (const feature of this.features) {
-            const matches = feature.detect(ast, code);
-            for (const match of matches) {
-                const key = `${match.start.line}:${match.start.column}`;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    allMatches.push(match);
-                }
-            }
-        }
-
-        return allMatches;
-    }
+        ast?: unknown,
+        parentCtx?: Context
+    ): Promise<RuleCheckResult[]>;
 
     /**
-     * Core check logic to be implemented by subclasses.
+     * Dispatches child rules sequentially.
+     * Available for parent rules that need to coordinate children.
      */
-    protected abstract check(code: string): Promise<RuleCheckResult | null>;
+    protected async executeChildren(
+        code: string,
+        ast: unknown | undefined,
+        ctx: Context
+    ): Promise<RuleCheckResult[]> {
+        const all: RuleCheckResult[] = [];
+        for (const child of this.children) {
+            const childResults = await child.test(code, ast, ctx);
+            all.push(...childResults);
+        }
+        return all;
+    }
 }

@@ -1,33 +1,31 @@
-import { Rule } from "../types/rule/rule";
+export class Context {
 
-export interface CheckContext {
-  code: string;
-  language: string;
-  rules: Rule[];
-}
+  private store = new Map<string, unknown>();
+  private parent: Context | null;
 
-export class GlobalContext {
-  private static instance: GlobalContext;
-  private currentContext: CheckContext | null = null;
+  constructor(parent?: Context) {
+    this.parent = parent ?? null;
+  }
 
-  private constructor() {}
+  set<T>(key: string, value: T): void {
+    this.store.set(key, value);
+  }
 
-  public static getInstance(): GlobalContext {
-    if (!GlobalContext.instance) {
-      GlobalContext.instance = new GlobalContext();
+  /**
+   * Looks up the key in this context first, then walks up the parent chain.
+   */
+  get<T>(key: string): T | undefined {
+    if (this.store.has(key)) {
+      return this.store.get(key) as T;
     }
-    return GlobalContext.instance;
+    return this.parent?.get<T>(key);
   }
 
-  public setContext(context: CheckContext): void {
-    this.currentContext = context;
+  has(key: string): boolean {
+    return this.store.has(key) || (this.parent?.has(key) ?? false);
   }
 
-  public getContext(): CheckContext | null {
-    return this.currentContext;
-  }
-
-  public clear(): void {
-    this.currentContext = null;
+  createChild(): Context {
+    return new Context(this);
   }
 }

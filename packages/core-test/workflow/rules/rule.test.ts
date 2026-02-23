@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   Rule,
   RuleCheckResult,
-  RuleType,
 } from "@code-check/core";
 
 describe("RuleCheckResult", () => {
@@ -32,20 +31,20 @@ describe("RuleCheckResult", () => {
 
 describe("Rule (abstract class)", () => {
   class TestRule extends Rule {
-    constructor(name: string, description: string, type: RuleType) {
-      super(name, description, type);
+    constructor(name: string, description: string) {
+      super({ name, description, messages: {} });
     }
 
-    public async test(code: string): Promise<RuleCheckResult | null> {
+    public async test(code: string): Promise<RuleCheckResult[]> {
       if (code.includes("error")) {
-        return new RuleCheckResult(false, "Found error keyword", code, code);
+        return [new RuleCheckResult(false, "Found error keyword", code, code)];
       }
-      return null;
+      return [];
     }
   }
 
   it("should set name, description, and type correctly", () => {
-    const rule = new TestRule("test-rule", "A test rule", "code");
+    const rule = new TestRule("test-rule", "A test rule");
 
     expect(rule.name).toBe("test-rule");
     expect(rule.description).toBe("A test rule");
@@ -53,17 +52,17 @@ describe("Rule (abstract class)", () => {
   });
 
   it("should return result when violation is found", async () => {
-    const rule = new TestRule("test-rule", "A test rule", "code");
-    const result = await rule.test("this has error in it");
+    const rule = new TestRule("test-rule", "A test rule");
+    const results = await rule.test("this has error in it");
 
-    expect(result).not.toBeNull();
-    expect(result!.success).toBe(false);
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(false);
   });
 
-  it("should return null when no violation is found", async () => {
-    const rule = new TestRule("test-rule", "A test rule", "code");
-    const result = await rule.test("this is clean code");
+  it("should return empty array when no violation is found", async () => {
+    const rule = new TestRule("test-rule", "A test rule");
+    const results = await rule.test("this is clean code");
 
-    expect(result).toBeNull();
+    expect(results).toHaveLength(0);
   });
 });
