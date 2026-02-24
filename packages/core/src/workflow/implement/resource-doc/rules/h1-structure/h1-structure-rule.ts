@@ -1,5 +1,4 @@
 import type { MarkdownNode } from "../../../../../tools/ast-parser/markdown";
-import { MarkdownParser } from "../../../../../tools/ast-parser/markdown";
 import {
     NodePattern,
     heading,
@@ -7,19 +6,13 @@ import {
     optionalNode,
     tagged,
 } from "../../../../../tools/node-pattern";
+import { bodyCheck, type CheckFailure } from "../../../../../tools/section-check";
 import { Rule, RuleCheckResult, RuleMeta } from "../../../../types/rule/rule";
 import { Context } from "../../../../context/context";
 import {
     CTX_EXPECTED_DESCRIPTION,
     CTX_RESOURCE_NAME,
-    CTX_H1_TITLE,
-    CTX_H1_DESC_TEXT,
-    CTX_H1_SECTION_LINES,
-    CTX_H1_SECTION_START_LINE,
 } from "../../context-keys";
-import { H1TitleMatchesResourceRule } from "./h1-title-matches-resource-rule";
-import { H1DescriptionMatchesRule } from "./h1-description-matches-rule";
-import { SpecialNotesFormatRule } from "./special-notes-format-rule";
 
 const H1_SECTION_OPENING = new NodePattern([
     tagged("h1", heading(1)),
@@ -31,21 +24,12 @@ const META: RuleMeta = {
     description:
         "First-level heading section must match frontmatter " +
         "(title, description) and use proper -> format for special notes",
-    messages: {
-        badStructure: (detail: unknown) =>
-            `H1 section structure mismatch: ${detail}. ` +
-            `Expected: ${H1_SECTION_OPENING.toDisplayFormat()}`,
-    },
+    messages: {},
 };
 
 export class H1StructureRule extends Rule {
-    private readonly parser = new MarkdownParser();
-
     constructor() {
         super(META, "code");
-        this.addChild(new H1TitleMatchesResourceRule());
-        this.addChild(new H1DescriptionMatchesRule());
-        this.addChild(new SpecialNotesFormatRule());
     }
 
     public async test(
@@ -57,66 +41,70 @@ export class H1StructureRule extends Rule {
 
         const resourceName = parentCtx.get<string>(CTX_RESOURCE_NAME);
         if (!resourceName) return [];
+        const expectedDescription =
+            parentCtx.get<string>(CTX_EXPECTED_DESCRIPTION) ?? "";
 
         const doc = ast as MarkdownNode;
-        const body = this.parser.getBodyChildren(doc);
+        const failures = await bodyCheck()
+            .structure(H1_SECTION_OPENING)
+            .taggedTextEquals("h1", resourceName)
+            .taggedTextEquals("desc", expectedDescription, {
+                normalize: (s) => s.replace(/\s+/g, " ").trim(),
+            })
+            .validate((section) =>
+                this.checkSpecialNotesFormat(section.lines, section.startLine)
+            )
+            .run(doc, code);
 
-        const result = H1_SECTION_OPENING.match(body);
-        if (!result.ok) {
-            const detail = H1_SECTION_OPENING.describeFailure(body);
-            return [this.fail("badStructure", code, undefined, detail)];
-        }
-
-        const h1Node = result.value.tagged["h1"][0];
-        const descNodes = result.value.tagged["desc"] ?? [];
-
-        const ctx = parentCtx.createChild();
-        ctx.set(CTX_RESOURCE_NAME, resourceName);
-        ctx.set(
-            CTX_EXPECTED_DESCRIPTION,
-            parentCtx.get<string>(CTX_EXPECTED_DESCRIPTION) ?? ""
+        return failures.map(
+            (failure) => new RuleCheckResult(false, failure.message, code, code)
         );
-        ctx.set(CTX_H1_TITLE, this.parser.getTextContent(h1Node).trim());
-
-        if (descNodes.length > 0) {
-            ctx.set(
-                CTX_H1_DESC_TEXT,
-                this.parser.getTextContent(descNodes[0])
-            );
-        }
-
-        const section = this.extractH1SectionText(code, body);
-        if (section) {
-            ctx.set(CTX_H1_SECTION_LINES, section.lines);
-            ctx.set(CTX_H1_SECTION_START_LINE, section.startLine);
-        }
-
-        return [RuleCheckResult.aggregate(
-            await this.executeChildren(code, ast, ctx)
-        )];
     }
 
-    private extractH1SectionText(
-        code: string,
-        body: MarkdownNode[]
-    ): { lines: string[]; startLine: number } | null {
-        const h1Node = body[0];
-        if (!h1Node?.sourceRange) return null;
+    private checkSpecialNotesFormat(
+        lines: string[],
+        startLine: number
+    ): CheckFailure[] {
+        const failures: CheckFailure[] = [];
+        const arrowLinePattern = /^(\s*)->\s*(.*)?$/;
+        const continuationPattern = /^(\s+).+$/;
 
-        const allLines = code.split(/\r?\n/);
-        const contentStart = h1Node.sourceRange.start.line;
-
-        let endLine = allLines.length;
-        for (let i = 1; i < body.length; i++) {
-            if (body[i].type === "heading" && body[i].sourceRange) {
-                endLine = body[i].sourceRange!.start.line - 1;
-                break;
+        let i = 0;
+        while (i < lines.length) {
+            const match = lines[i].match(arrowLinePattern);
+            if (!match) {
+                i++;
+                continue;
             }
+
+            const leadingSpaces = match[1].length;
+            const contentStartCol = leadingSpaces + 3;
+            let j = i + 1;
+            while (j < lines.length) {
+                const line = lines[j];
+                if (line.trim() === "") break;
+                if (arrowLinePattern.test(line)) break;
+
+                const contMatch = line.match(continuationPattern);
+                if (contMatch) {
+                    const indent = contMatch[1].length;
+                    if (indent > 0 && indent < contentStartCol) {
+                        const currentLine = startLine + j;
+                        failures.push({
+                            message:
+                                `Special note continuation line ${currentLine} should be ` +
+                                `indented to align with content after "->" ` +
+                                `(expected ${contentStartCol} spaces)`,
+                            line: currentLine,
+                        });
+                    }
+                }
+                j++;
+            }
+
+            i = j;
         }
 
-        return {
-            lines: allLines.slice(contentStart, endLine),
-            startLine: contentStart + 1,
-        };
+        return failures;
     }
 }

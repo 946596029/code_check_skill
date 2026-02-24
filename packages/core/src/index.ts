@@ -21,7 +21,6 @@ export {
     FrontmatterExistsRule,
     H1StructureRule,
     ExampleUsageStructureRule,
-    ArgumentDescriptionFormatRule,
     RESOURCE_DOC_RULES,
 } from "./workflow/implement/resource-doc/rules";
 
@@ -29,12 +28,22 @@ export {
 export {
     getFormatSpec,
     DESCRIPTION_INTENTS,
-} from "./workflow/implement/resource-doc/rules/argument-reference-structure";
+    DescriptionIntentDetector,
+    DETECTABLE_DESCRIPTION_INTENTS,
+    extractSlotsForIntent,
+    suggestNormalizedSentence,
+} from "./tools/llm";
 export type {
     DescriptionIntent,
+    DetectableDescriptionIntent,
     DescriptionFormatSpec,
     FormatValidationResult,
-} from "./workflow/implement/resource-doc/rules/argument-reference-structure";
+    SlotMap,
+    SlotValue,
+    IntentResult,
+    IntentDetectionResult,
+    DetectionStatus,
+} from "./tools/llm";
 export { DescriptionIntentClassifier } from "./workflow/implement/resource-doc/rules/argument-reference-structure";
 
 // ── LLM ──
@@ -129,3 +138,7 @@ export type {
     ParserOptions,
     CommonMarkNode,
 } from "./tools/ast-parser/markdown";
+
+// ── Section Check ──
+export { SectionCheck, sectionCheck, bodyCheck } from "./tools/section-check";
+export type { CheckFailure, BulletItem, SectionData } from "./tools/section-check";

@@ -508,6 +508,43 @@ export class MarkdownParser {
     }
 
     /**
+     * Flatten markdown list nodes into their direct item nodes.
+     */
+    public getBulletItems(listNodes: MarkdownNode[]): MarkdownNode[] {
+        const items: MarkdownNode[] = [];
+        for (const listNode of listNodes) {
+            if (listNode.type !== "list") continue;
+            for (const child of listNode.children) {
+                if (child.type === "item") {
+                    items.push(child);
+                }
+            }
+        }
+        return items;
+    }
+
+    /**
+     * Extract a bullet item's first line in normalized "* " form.
+     */
+    public getItemBulletLine(
+        source: string,
+        item: MarkdownNode
+    ): { text: string; startLine: number } | null {
+        if (item.type !== "item") return null;
+
+        const nodeText = this.getNodeText(source, item);
+        if (!nodeText || nodeText.lines.length === 0) return null;
+
+        const firstLine = nodeText.lines[0].trim();
+        if (!firstLine) return null;
+
+        return {
+            text: firstLine.startsWith("* ") ? firstLine : `* ${firstLine}`,
+            startLine: nodeText.startLine,
+        };
+    }
+
+    /**
      * Find the next sibling of `anchor` within `parent`'s children.
      *
      * If a predicate is given, skips siblings that don't match.

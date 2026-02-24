@@ -1,5 +1,4 @@
 import type { MarkdownNode } from "../../../../tools/ast-parser/markdown";
-import { MarkdownParser } from "../../../../tools/ast-parser/markdown";
 import {
     NodePattern,
     heading,
@@ -10,8 +9,8 @@ import {
     group,
     oneOrMoreGroup,
 } from "../../../../tools/node-pattern";
+import { sectionCheck } from "../../../../tools/section-check";
 import { Rule, RuleCheckResult, RuleMeta } from "../../../types/rule/rule";
-import { Context } from "../../../context/context";
 
 const META: RuleMeta = {
     name: "example-usage-structure",
@@ -71,8 +70,6 @@ function matchesFully(
 }
 
 export class ExampleUsageStructureRule extends Rule {
-    private readonly parser = new MarkdownParser();
-
     constructor() {
         super(META, "code");
     }
@@ -80,42 +77,53 @@ export class ExampleUsageStructureRule extends Rule {
     public async test(
         code: string,
         ast?: unknown,
-        _parentCtx?: Context
+        _parentCtx?: unknown
     ): Promise<RuleCheckResult[]> {
         if (!ast) return [];
 
         const doc = ast as MarkdownNode;
-        const nodes = this.parser.getSection(doc, 2, "Example Usage");
-        if (!nodes) return [];
+        const failures = await sectionCheck("Example Usage", 2)
+            .validate((section) => {
+                const nodes = section.nodes;
+                const codeBlocks = nodes.filter((n) => n.type === "code_block");
+                if (codeBlocks.length === 0) return [];
 
-        const codeBlocks = this.parser.filterByType(nodes, "code_block");
-        if (codeBlocks.length === 0) return [];
+                if (
+                    matchesFully(SINGLE_EXAMPLE, nodes) ||
+                    matchesFully(MULTI_EXAMPLE, nodes)
+                ) {
+                    return [];
+                }
 
-        if (matchesFully(SINGLE_EXAMPLE, nodes) ||
-            matchesFully(MULTI_EXAMPLE, nodes)) {
-            return [];
-        }
+                if (codeBlocks.length === 1) {
+                    const h3Headings = nodes.filter(
+                        (n) => n.type === "heading" && n.level === 3
+                    );
+                    return h3Headings.map((n) => ({
+                        message: this.msg(
+                            "unnecessaryH3",
+                            n.sourceRange?.start.line ?? 0
+                        ),
+                        line: n.sourceRange?.start.line ?? 0,
+                    }));
+                }
 
-        if (codeBlocks.length === 1) {
-            const h3Headings = nodes.filter(
-                (n) => n.type === "heading" && n.level === 3
-            );
-            return h3Headings.map((n) =>
-                this.fail("unnecessaryH3", code, undefined,
-                    n.sourceRange?.start.line ?? 0)
-            );
-        }
+                const matches = H3_THEN_CODE.findAll(nodes);
+                const matchedCodes = new Set(
+                    matches.flatMap((m) => m.tagged["code"])
+                );
 
-        const matches = H3_THEN_CODE.findAll(nodes);
-        const matchedCodes = new Set(
-            matches.flatMap((m) => m.tagged["code"])
+                return codeBlocks
+                    .filter((n) => !matchedCodes.has(n))
+                    .map((n) => ({
+                        message: this.msg("missingH3", n.sourceRange?.start.line ?? 0),
+                        line: n.sourceRange?.start.line ?? 0,
+                    }));
+            })
+            .run(doc, code);
+
+        return failures.map(
+            (failure) => new RuleCheckResult(false, failure.message, code, code)
         );
-
-        return codeBlocks
-            .filter((n) => !matchedCodes.has(n))
-            .map((n) =>
-                this.fail("missingH3", code, undefined,
-                    n.sourceRange?.start.line ?? 0)
-            );
     }
 }

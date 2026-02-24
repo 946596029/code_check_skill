@@ -1,5 +1,4 @@
 import type { MarkdownNode } from "../../../../../tools/ast-parser/markdown";
-import { MarkdownParser } from "../../../../../tools/ast-parser/markdown";
 import {
     NodePattern,
     nodeType,
@@ -8,15 +7,17 @@ import {
     optionalNode,
     oneOrMoreGroup,
 } from "../../../../../tools/node-pattern";
-import { Rule, RuleCheckResult, RuleMeta } from "../../../../types/rule/rule";
-import { Context } from "../../../../context/context";
 import {
-    CTX_ATTR_REF_LINES,
-    CTX_ATTR_REF_START_LINE,
-    CTX_ATTR_REF_BULLET_LISTS,
-} from "../../context-keys";
-import { AttributeIntroMatchesRule } from "./attribute-intro-matches-rule";
-import { AttributeBulletFormatRule } from "./attribute-bullet-format-rule";
+    sectionCheck,
+} from "../../../../../tools/section-check";
+import {
+    LinePattern,
+    literal,
+    backticked,
+    spaces,
+    rest,
+} from "../../../../../tools/line-pattern";
+import { Rule, RuleCheckResult, RuleMeta } from "../../../../types/rule/rule";
 
 const SECTION_STRUCTURE = new NodePattern([
     nodeType("paragraph"),
@@ -26,58 +27,47 @@ const SECTION_STRUCTURE = new NodePattern([
     ]),
 ]);
 
+const ATTR_BULLET_PATTERN = new LinePattern([
+    literal("* "),
+    backticked("attr_name"),
+    spaces(1),
+    literal("-"),
+    spaces(1),
+    rest("description"),
+]);
+
+const EXPECTED_INTRO =
+    "In addition to all arguments above, the following attributes are exported:";
+
 const META: RuleMeta = {
     name: "attributes-reference-structure",
     description:
         "Attributes Reference section must consist of one or more " +
         "bullet lists, each optionally followed by a paragraph",
-    messages: {
-        badStructure: (detail: unknown) =>
-            `Attributes Reference section structure mismatch: ${detail}. ` +
-            `Expected: ${SECTION_STRUCTURE.toDisplayFormat()}`,
-    },
+    messages: {},
 };
 
 export class AttributesReferenceStructureRule extends Rule {
-    private readonly parser = new MarkdownParser();
-
     constructor() {
         super(META, "code");
-        this.addChild(new AttributeIntroMatchesRule());
-        this.addChild(new AttributeBulletFormatRule());
     }
 
     public async test(
         code: string,
         ast?: unknown,
-        parentCtx?: Context
+        _parentCtx?: unknown
     ): Promise<RuleCheckResult[]> {
         if (!ast) return [];
 
         const doc = ast as MarkdownNode;
-        const nodes = this.parser.getSection(doc, 2, "Attributes Reference");
-        if (!nodes) return [];
+        const failures = await sectionCheck("Attributes Reference", 2)
+            .structure(SECTION_STRUCTURE)
+            .introLine(EXPECTED_INTRO)
+            .eachBulletItem((firstLine) => firstLine.matches(ATTR_BULLET_PATTERN))
+            .run(doc, code);
 
-        const result = SECTION_STRUCTURE.match(nodes);
-        if (!result.ok) {
-            const detail = SECTION_STRUCTURE.describeFailure(nodes);
-            return [this.fail("badStructure", code, undefined, detail)];
-        }
-
-        const bulletLists = result.value.tagged["bullets"] ?? [];
-
-        const section = this.parser.getSectionText(
-            code, 2, "Attributes Reference"
+        return failures.map(
+            (failure) => new RuleCheckResult(false, failure.message, code, code)
         );
-        if (!section) return [];
-
-        const ctx = parentCtx ? parentCtx.createChild() : new Context();
-        ctx.set(CTX_ATTR_REF_LINES, section.lines);
-        ctx.set(CTX_ATTR_REF_START_LINE, section.startLine);
-        ctx.set(CTX_ATTR_REF_BULLET_LISTS, bulletLists);
-
-        return [RuleCheckResult.aggregate(
-            await this.executeChildren(code, ast, ctx)
-        )];
     }
 }

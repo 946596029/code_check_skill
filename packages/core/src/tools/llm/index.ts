@@ -16,3 +16,23 @@ export type {
     StructuredCallSuccess,
     StructuredCallFailure,
 } from "./structured-caller";
+
+export {
+    DescriptionIntentDetector,
+    extractSlotsForIntent,
+    suggestNormalizedSentence,
+    getFormatSpec,
+    DESCRIPTION_INTENTS,
+    DETECTABLE_DESCRIPTION_INTENTS,
+} from "./description-intent";
+export type {
+    DescriptionIntent,
+    DetectableDescriptionIntent,
+    SlotMap,
+    SlotValue,
+    IntentResult,
+    IntentDetectionResult,
+    DetectionStatus,
+    FormatValidationResult,
+    DescriptionFormatSpec,
+} from "./description-intent";

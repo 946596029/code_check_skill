@@ -1,5 +1,4 @@
 import type { MarkdownNode } from "../../../../../tools/ast-parser/markdown";
-import { MarkdownParser } from "../../../../../tools/ast-parser/markdown";
 import {
     NodePattern,
     nodeType,
@@ -8,16 +7,22 @@ import {
     optionalNode,
     oneOrMoreGroup,
 } from "../../../../../tools/node-pattern";
-import { Rule, RuleCheckResult, RuleMeta } from "../../../../types/rule/rule";
-import { Context } from "../../../../context/context";
+import { sectionCheck } from "../../../../../tools/section-check";
 import {
-    CTX_ARG_REF_LINES,
-    CTX_ARG_REF_START_LINE,
-    CTX_ARG_REF_BULLET_LISTS,
-} from "../../context-keys";
-import { ArgumentIntroMatchesRule } from "./argument-intro-matches-rule";
-import { ArgumentBulletFormatRule } from "./argument-item/argument-bullet-format-rule";
-import { ArgumentDescriptionFormatRule } from "./argument-item/description/argument-description-format-rule";
+    LinePattern,
+    literal,
+    backticked,
+    spaces,
+    csvParenthesized,
+    keyword,
+    rest,
+} from "../../../../../tools/line-pattern";
+import { Rule, RuleCheckResult, RuleMeta } from "../../../../types/rule/rule";
+import { createQwenModel } from "../../../../../llm/model";
+import {
+    DescriptionIntentDetector,
+    getFormatSpec,
+} from "../../../../../tools/llm/description-intent";
 
 const SECTION_STRUCTURE = new NodePattern([
     nodeType("paragraph"),
@@ -27,57 +32,114 @@ const SECTION_STRUCTURE = new NodePattern([
     ]),
 ]);
 
+const EXPECTED_INTRO = "The following arguments are supported:";
+
+const MODIFIERS = ["Required", "Optional"];
+const TYPES = ["String", "Int", "Bool", "List", "Map", "Float", "Set"];
+const TAGS = [
+    "ForceNew",
+    "NonUpdatable",
+    "Deprecated",
+    "Computed",
+    "Sensitive",
+];
+
+const ARG_BULLET_PATTERN = new LinePattern([
+    literal("* "),
+    backticked("arg_name"),
+    spaces(1),
+    literal("-"),
+    spaces(1),
+    csvParenthesized([
+        { name: "Modifier", values: MODIFIERS },
+        { name: "Type", values: TYPES },
+        { name: "Tag", values: TAGS, zeroOrMore: true },
+    ]),
+    spaces(1),
+    keyword("Specifies"),
+    spaces(1),
+    rest("description"),
+]);
+
 const META: RuleMeta = {
     name: "argument-reference-structure",
     description:
         "Argument Reference section must consist of one or more " +
         "bullet lists, each optionally followed by a paragraph",
-    messages: {
-        badStructure: (detail: unknown) =>
-            `Argument Reference section structure mismatch: ${detail}. ` +
-            `Expected: ${SECTION_STRUCTURE.toDisplayFormat()}`,
-    },
+    messages: {},
 };
 
 export class ArgumentReferenceStructureRule extends Rule {
-    private readonly parser = new MarkdownParser();
+    private detector: DescriptionIntentDetector | null = null;
 
     constructor() {
         super(META, "code");
-        this.addChild(new ArgumentIntroMatchesRule());
-        this.addChild(new ArgumentBulletFormatRule());
-        this.addChild(new ArgumentDescriptionFormatRule());
+    }
+
+    private getDetector(): DescriptionIntentDetector {
+        if (!this.detector) {
+            const model = createQwenModel({ streaming: false });
+            this.detector = new DescriptionIntentDetector(model);
+        }
+        return this.detector;
     }
 
     public async test(
         code: string,
         ast?: unknown,
-        parentCtx?: Context
+        _parentCtx?: unknown
     ): Promise<RuleCheckResult[]> {
         if (!ast) return [];
 
         const doc = ast as MarkdownNode;
-        const nodes = this.parser.getSection(doc, 2, "Argument Reference");
-        if (!nodes) return [];
+        const detector = this.getDetector();
 
-        const result = SECTION_STRUCTURE.match(nodes);
-        if (!result.ok) {
-            const detail = SECTION_STRUCTURE.describeFailure(nodes);
-            return [this.fail("badStructure", code, undefined, detail)];
-        }
+        const failures = await sectionCheck("Argument Reference", 2)
+            .structure(SECTION_STRUCTURE)
+            .introLine(EXPECTED_INTRO)
+            .eachBulletItem((firstLine) => firstLine.matches(ARG_BULLET_PATTERN))
+            .eachBulletItemAsync(async (item) => {
+                if (!item.descriptionText.trim()) return null;
 
-        const bulletLists = result.value.tagged["bullets"] ?? [];
+                const detection = await detector.detect(
+                    item.argName,
+                    item.descriptionText
+                );
 
-        const section = this.parser.getSectionText(code, 2, "Argument Reference");
-        if (!section) return [];
+                if (detection.status === "none") return null;
+                if (detection.status === "suspected-standard-intent") {
+                    return {
+                        message:
+                            `Argument \`${item.argName}\` description appears to use a ` +
+                            "standard constraint intent, but the intent cannot be classified. " +
+                            "Please rewrite it using a standard sentence template.",
+                        line: item.startLine,
+                    };
+                }
 
-        const ctx = parentCtx ? parentCtx.createChild() : new Context();
-        ctx.set(CTX_ARG_REF_LINES, section.lines);
-        ctx.set(CTX_ARG_REF_START_LINE, section.startLine);
-        ctx.set(CTX_ARG_REF_BULLET_LISTS, bulletLists);
+                for (const intentResult of detection.intents) {
+                    const spec = getFormatSpec(intentResult.name);
+                    if (!spec) continue;
 
-        return [RuleCheckResult.aggregate(
-            await this.executeChildren(code, ast, ctx)
-        )];
+                    const validation = spec.validate(item.descriptionLines);
+                    if (validation.ok) continue;
+
+                    return {
+                        message:
+                            `Argument \`${item.argName}\` description has "${intentResult.name}" ` +
+                            "intent but does not follow the expected format. " +
+                            `Expected: ${validation.expected}` +
+                            (validation.detail ? ` (${validation.detail})` : ""),
+                        line: item.startLine,
+                    };
+                }
+
+                return null;
+            })
+            .run(doc, code);
+
+        return failures.map(
+            (failure) => new RuleCheckResult(false, failure.message, code, code)
+        );
     }
 }
