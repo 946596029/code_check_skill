@@ -8,14 +8,17 @@ import type {
 const SEPARATOR = "─".repeat(60);
 const INDENT = "  ";
 const CODE_PREFIX = "    | ";
+const MAX_SNIPPET_LINES = 5;
 const MAX_CODE_LINES = 10;
 
 interface ReportOptions {
   filePath: string;
+  sourceCode?: string;
 }
 
 export function printReport(report: CheckReport, options: ReportOptions): boolean {
-  const { filePath } = options;
+  const { filePath, sourceCode } = options;
+  const sourceLines = sourceCode?.split(/\r?\n/) ?? [];
 
   console.log();
   console.log(`File:     ${filePath}`);
@@ -30,12 +33,10 @@ export function printReport(report: CheckReport, options: ReportOptions): boolea
 
     if (failureCount === 0) {
       totalPassed++;
-      printRuleResult(ruleResult, failureCount);
-      continue;
+    } else {
+      totalFailed++;
     }
-
-    totalFailed++;
-    printRuleResult(ruleResult, failureCount);
+    printRuleResult(ruleResult, failureCount, sourceLines);
   }
 
   console.log(SEPARATOR);
@@ -50,7 +51,11 @@ export function printReport(report: CheckReport, options: ReportOptions): boolea
   return totalFailed === 0;
 }
 
-function printRuleResult(ruleResult: RuleResult, failureCount: number): void {
+function printRuleResult(
+  ruleResult: RuleResult,
+  failureCount: number,
+  sourceLines: string[]
+): void {
   const passed = failureCount === 0;
   const status = passed
     ? "\x1b[32m✓ PASS\x1b[0m"
@@ -61,7 +66,7 @@ function printRuleResult(ruleResult: RuleResult, failureCount: number): void {
   console.log();
 
   for (const result of ruleResult.results) {
-    printResultTree(result, 1);
+    printResultTree(result, 1, sourceLines);
   }
 }
 
@@ -78,7 +83,11 @@ function collectAllFailures(results: RuleCheckResult[]): RuleCheckResult[] {
   return failures;
 }
 
-function printResultTree(result: RuleCheckResult, depth: number): void {
+function printResultTree(
+  result: RuleCheckResult,
+  depth: number,
+  sourceLines: string[]
+): void {
   const treeIndent = INDENT.repeat(depth);
   const rangeDisplay = formatRange(result.range) ?? "(no range)";
   const message = result.message || "(no message)";
@@ -87,30 +96,70 @@ function printResultTree(result: RuleCheckResult, depth: number): void {
   console.log(`${treeIndent}success: ${result.success}`);
   console.log(`${treeIndent}message: ${message}`);
 
+  const snippet = extractSnippet(sourceLines, result.range);
+  if (snippet) {
+    console.log(`${treeIndent}code:`);
+    printCodeBlock(snippet);
+  }
+
   if (!result.success) {
-    console.log(`${treeIndent}original:`);
-    printCodeBlock(result.original);
-    console.log(`${treeIndent}suggested:`);
-    printCodeBlock(result.suggested);
+    const hasSuggestion =
+      result.original &&
+      result.suggested &&
+      result.original !== result.suggested;
+    if (hasSuggestion) {
+      console.log(`${treeIndent}original:`);
+      printCodeBlock(result.original, MAX_CODE_LINES);
+      console.log(`${treeIndent}suggested:`);
+      printCodeBlock(result.suggested, MAX_CODE_LINES);
+    }
   }
 
   console.log();
 
   for (const child of result.children ?? []) {
-    printResultTree(child, depth + 1);
+    printResultTree(child, depth + 1, sourceLines);
   }
 }
 
-function printCodeBlock(code: string): void {
+function extractSnippet(
+  sourceLines: string[],
+  range?: SourceRange
+): string | undefined {
+  if (!range?.start || sourceLines.length === 0) return undefined;
+
+  const rangeStart = range.start.line;
+  const rangeEnd = range.end?.line ?? rangeStart;
+
+  const contextBefore = 1;
+  const from = Math.max(1, rangeStart - contextBefore);
+  const to = Math.min(sourceLines.length, rangeEnd);
+  const cappedTo = Math.min(to, from + MAX_SNIPPET_LINES - 1);
+
+  const lines = sourceLines.slice(from - 1, cappedTo);
+  if (lines.length === 0) return undefined;
+
+  const padWidth = String(cappedTo).length;
+  const numbered = lines.map(
+    (line, i) => `${String(from + i).padStart(padWidth)}: ${line}`
+  );
+  if (cappedTo < to) {
+    numbered.push(`... (${to - cappedTo} more lines)`);
+  }
+  return numbered.join("\n");
+}
+
+function printCodeBlock(code: string, maxLines?: number): void {
   if (!code) {
     console.log(`${CODE_PREFIX}(empty)`);
     return;
   }
 
   const lines = code.split(/\r?\n/);
+  const limit = maxLines ?? lines.length;
   const display =
-    lines.length > MAX_CODE_LINES
-      ? [...lines.slice(0, MAX_CODE_LINES), `... (${lines.length - MAX_CODE_LINES} more lines)`]
+    lines.length > limit
+      ? [...lines.slice(0, limit), `... (${lines.length - limit} more lines)`]
       : lines;
 
   for (const line of display) {

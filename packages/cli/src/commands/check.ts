@@ -13,6 +13,6 @@ export async function checkCommand(
 
   const report = await checker.check({ code, workflowId });
 
-  const allPassed = printReport(report, { filePath: resolved });
+  const allPassed = printReport(report, { filePath: resolved, sourceCode: code });
   process.exit(allPassed ? 0 : 1);
 }
