@@ -6,12 +6,26 @@ import {
 
 describe("RuleCheckResult", () => {
   it("should create instance with all properties", () => {
-    const result = new RuleCheckResult(true, "All checks passed", "const x = 1;", "const x = 1;");
+    const result = new RuleCheckResult(
+      true,
+      "All checks passed",
+      "const x = 1;",
+      "const x = 1;",
+      [],
+      {
+        start: { line: 1, column: 1 },
+        end: { line: 1, column: 12 },
+      }
+    );
 
     expect(result.success).toBe(true);
     expect(result.message).toBe("All checks passed");
     expect(result.original).toBe("const x = 1;");
     expect(result.suggested).toBe("const x = 1;");
+    expect(result.range).toEqual({
+      start: { line: 1, column: 1 },
+      end: { line: 1, column: 12 },
+    });
   });
 
   it("should create instance for failed check", () => {
@@ -26,6 +40,15 @@ describe("RuleCheckResult", () => {
     expect(result.message).toBe("Variable should use const");
     expect(result.original).toBe("let x = 1;");
     expect(result.suggested).toBe("const x = 1;");
+    expect(result.range).toBeUndefined();
+  });
+
+  it("should convert line to single-line range", () => {
+    expect(RuleCheckResult.fromLine(5)).toEqual({
+      start: { line: 5, column: 1 },
+      end: { line: 5, column: 1 },
+    });
+    expect(RuleCheckResult.fromLine(0)).toBeUndefined();
   });
 });
 

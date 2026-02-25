@@ -1,4 +1,9 @@
-import type { CheckReport, RuleResult, RuleCheckResult } from "@code-check/core";
+import type {
+  CheckReport,
+  RuleResult,
+  RuleCheckResult,
+  SourceRange,
+} from "@code-check/core";
 
 const SEPARATOR = "─".repeat(60);
 const INDENT = "  ";
@@ -7,11 +12,10 @@ const MAX_CODE_LINES = 10;
 
 interface ReportOptions {
   filePath: string;
-  showPassedRules?: boolean;
 }
 
 export function printReport(report: CheckReport, options: ReportOptions): boolean {
-  const { filePath, showPassedRules = false } = options;
+  const { filePath } = options;
 
   console.log();
   console.log(`File:     ${filePath}`);
@@ -22,18 +26,16 @@ export function printReport(report: CheckReport, options: ReportOptions): boolea
   let totalFailed = 0;
 
   for (const ruleResult of report.results) {
-    const failures = collectAllFailures(ruleResult.results);
+    const failureCount = collectAllFailures(ruleResult.results).length;
 
-    if (failures.length === 0) {
+    if (failureCount === 0) {
       totalPassed++;
-      if (showPassedRules) {
-        console.log(`${INDENT}\x1b[32m✓ PASS\x1b[0m  ${ruleResult.ruleName}`);
-      }
+      printRuleResult(ruleResult, failureCount);
       continue;
     }
 
     totalFailed++;
-    printRuleFailure(ruleResult, failures);
+    printRuleResult(ruleResult, failureCount);
   }
 
   console.log(SEPARATOR);
@@ -48,35 +50,18 @@ export function printReport(report: CheckReport, options: ReportOptions): boolea
   return totalFailed === 0;
 }
 
-function printRuleFailure(
-  ruleResult: RuleResult,
-  failures: RuleCheckResult[]
-): void {
+function printRuleResult(ruleResult: RuleResult, failureCount: number): void {
+  const passed = failureCount === 0;
+  const status = passed
+    ? "\x1b[32m✓ PASS\x1b[0m"
+    : "\x1b[31m✗ FAIL\x1b[0m";
   console.log(SEPARATOR);
-  console.log(
-    `${INDENT}\x1b[31m✗ FAIL\x1b[0m  ${ruleResult.ruleName}`
-  );
-  console.log(
-    `${INDENT}        ${ruleResult.ruleDescription}`
-  );
+  console.log(`${INDENT}${status}  ${ruleResult.ruleName}`);
+  console.log(`${INDENT}        ${ruleResult.ruleDescription}`);
   console.log();
 
-  for (const failure of failures) {
-    console.log(`${INDENT}  \x1b[33m→\x1b[0m ${failure.message}`);
-
-    const hasDistinctSuggestion =
-      failure.suggested &&
-      failure.original !== failure.suggested;
-
-    if (hasDistinctSuggestion) {
-      console.log();
-      console.log(`${INDENT}  Original:`);
-      printCodeBlock(failure.original);
-      console.log(`${INDENT}  Suggested:`);
-      printCodeBlock(failure.suggested);
-    }
-
-    console.log();
+  for (const result of ruleResult.results) {
+    printResultTree(result, 1);
   }
 }
 
@@ -93,7 +78,35 @@ function collectAllFailures(results: RuleCheckResult[]): RuleCheckResult[] {
   return failures;
 }
 
+function printResultTree(result: RuleCheckResult, depth: number): void {
+  const treeIndent = INDENT.repeat(depth);
+  const rangeDisplay = formatRange(result.range) ?? "(no range)";
+  const message = result.message || "(no message)";
+
+  console.log(`${treeIndent}range: ${rangeDisplay}`);
+  console.log(`${treeIndent}success: ${result.success}`);
+  console.log(`${treeIndent}message: ${message}`);
+
+  if (!result.success) {
+    console.log(`${treeIndent}original:`);
+    printCodeBlock(result.original);
+    console.log(`${treeIndent}suggested:`);
+    printCodeBlock(result.suggested);
+  }
+
+  console.log();
+
+  for (const child of result.children ?? []) {
+    printResultTree(child, depth + 1);
+  }
+}
+
 function printCodeBlock(code: string): void {
+  if (!code) {
+    console.log(`${CODE_PREFIX}(empty)`);
+    return;
+  }
+
   const lines = code.split(/\r?\n/);
   const display =
     lines.length > MAX_CODE_LINES
@@ -103,4 +116,11 @@ function printCodeBlock(code: string): void {
   for (const line of display) {
     console.log(`${CODE_PREFIX}${line}`);
   }
+}
+
+function formatRange(range?: SourceRange): string | undefined {
+  if (!range) return undefined;
+  const { start, end } = range;
+  if (!start || !end) return undefined;
+  return `L${start.line}:C${start.column}-L${end.line}:C${end.column}`;
 }

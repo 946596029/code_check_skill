@@ -1,4 +1,5 @@
 import type { MarkdownNode } from "../../../../../tools/ast-parser/markdown";
+import { MarkdownParser } from "../../../../../tools/ast-parser/markdown";
 import {
     NodePattern,
     nodeType,
@@ -18,7 +19,7 @@ import {
     rest,
 } from "../../../../../tools/line-pattern";
 import { Rule, RuleCheckResult, RuleMeta } from "../../../../types/rule/rule";
-import { createQwenModel } from "../../../../../llm/model";
+import { createQwenModel } from "../../../../../tools/llm";
 import {
     DescriptionIntentDetector,
     getFormatSpec,
@@ -71,6 +72,7 @@ const META: RuleMeta = {
 
 export class ArgumentReferenceStructureRule extends Rule {
     private detector: DescriptionIntentDetector | null = null;
+    private readonly parser = new MarkdownParser();
 
     constructor() {
         super(META, "code");
@@ -89,10 +91,13 @@ export class ArgumentReferenceStructureRule extends Rule {
         ast?: unknown,
         _parentCtx?: unknown
     ): Promise<RuleCheckResult[]> {
-        if (!ast) return [];
+        if (!ast) {
+            return [RuleCheckResult.pass("AST is unavailable, rule skipped")];
+        }
 
         const doc = ast as MarkdownNode;
         const detector = this.getDetector();
+        const sectionText = this.parser.getSectionText(code, 2, "Argument Reference");
 
         const failures = await sectionCheck("Argument Reference", 2)
             .structure(SECTION_STRUCTURE)
@@ -138,8 +143,24 @@ export class ArgumentReferenceStructureRule extends Rule {
             })
             .run(doc, code);
 
+        if (failures.length === 0) {
+            return [
+                RuleCheckResult.pass(
+                    "Argument Reference section structure is valid",
+                    RuleCheckResult.fromLine(sectionText?.startLine)
+                ),
+            ];
+        }
+
         return failures.map(
-            (failure) => new RuleCheckResult(false, failure.message, code, code)
+            (failure) => new RuleCheckResult(
+                false,
+                failure.message,
+                code,
+                code,
+                [],
+                RuleCheckResult.fromLine(failure.line)
+            )
         );
     }
 }

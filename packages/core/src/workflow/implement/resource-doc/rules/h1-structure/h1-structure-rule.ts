@@ -1,4 +1,5 @@
 import type { MarkdownNode } from "../../../../../tools/ast-parser/markdown";
+import { MarkdownParser } from "../../../../../tools/ast-parser/markdown";
 import {
     NodePattern,
     heading,
@@ -28,6 +29,8 @@ const META: RuleMeta = {
 };
 
 export class H1StructureRule extends Rule {
+    private readonly parser = new MarkdownParser();
+
     constructor() {
         super(META, "code");
     }
@@ -37,10 +40,14 @@ export class H1StructureRule extends Rule {
         ast?: unknown,
         parentCtx?: Context
     ): Promise<RuleCheckResult[]> {
-        if (!ast || !parentCtx) return [];
+        if (!ast || !parentCtx) {
+            return [RuleCheckResult.pass("AST or context is unavailable, rule skipped")];
+        }
 
         const resourceName = parentCtx.get<string>(CTX_RESOURCE_NAME);
-        if (!resourceName) return [];
+        if (!resourceName) {
+            return [RuleCheckResult.pass("Resource name is unavailable, rule skipped")];
+        }
         const expectedDescription =
             parentCtx.get<string>(CTX_EXPECTED_DESCRIPTION) ?? "";
 
@@ -56,8 +63,26 @@ export class H1StructureRule extends Rule {
             )
             .run(doc, code);
 
+        if (failures.length === 0) {
+            const firstH1 = this.parser.getHeadings(doc)
+                .find((h) => h.level === 1)?.node;
+            return [
+                RuleCheckResult.pass(
+                    "H1 section structure matches frontmatter",
+                    firstH1?.sourceRange ?? undefined
+                ),
+            ];
+        }
+
         return failures.map(
-            (failure) => new RuleCheckResult(false, failure.message, code, code)
+            (failure) => new RuleCheckResult(
+                false,
+                failure.message,
+                code,
+                code,
+                [],
+                RuleCheckResult.fromLine(failure.line)
+            )
         );
     }
 

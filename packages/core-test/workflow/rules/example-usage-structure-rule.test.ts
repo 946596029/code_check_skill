@@ -12,6 +12,12 @@ function check(md: string) {
     return rule.test(md, ast);
 }
 
+function expectPassResult(results: Awaited<ReturnType<typeof check>>) {
+    expect(results).toHaveLength(1);
+    expect(results[0].success).toBe(true);
+    expect(results[0].message).toContain("Example Usage");
+}
+
 describe("ExampleUsageStructureRule", () => {
     describe("pass — no Example Usage section", () => {
         it("should pass when there is no Example Usage section", async () => {
@@ -21,7 +27,7 @@ describe("ExampleUsageStructureRule", () => {
                 "Some description.",
             ].join("\n"));
 
-            expect(results).toHaveLength(0);
+            expectPassResult(results);
         });
     });
 
@@ -35,7 +41,7 @@ describe("ExampleUsageStructureRule", () => {
                 "No code here.",
             ].join("\n"));
 
-            expect(results).toHaveLength(0);
+            expectPassResult(results);
         });
     });
 
@@ -51,7 +57,7 @@ describe("ExampleUsageStructureRule", () => {
                 "```",
             ].join("\n"));
 
-            expect(results).toHaveLength(0);
+            expectPassResult(results);
         });
 
         it("should pass with a paragraph before the code block", async () => {
@@ -67,7 +73,7 @@ describe("ExampleUsageStructureRule", () => {
                 "```",
             ].join("\n"));
 
-            expect(results).toHaveLength(0);
+            expectPassResult(results);
         });
     });
 
@@ -133,7 +139,7 @@ describe("ExampleUsageStructureRule", () => {
                 "```",
             ].join("\n"));
 
-            expect(results).toHaveLength(0);
+            expectPassResult(results);
         });
 
         it("should pass with paragraphs between h3 and code block", async () => {
@@ -159,7 +165,7 @@ describe("ExampleUsageStructureRule", () => {
                 "```",
             ].join("\n"));
 
-            expect(results).toHaveLength(0);
+            expectPassResult(results);
         });
     });
 
@@ -227,14 +233,16 @@ describe("ExampleUsageStructureRule", () => {
                 "```",
             ].join("\n"));
 
-            expect(results).toHaveLength(0);
+            expectPassResult(results);
         });
     });
 
     describe("pass — no ast provided", () => {
-        it("should return empty when ast is undefined", async () => {
+        it("should return skipped pass result when ast is undefined", async () => {
             const results = await rule.test("any code");
-            expect(results).toHaveLength(0);
+            expect(results).toHaveLength(1);
+            expect(results[0].success).toBe(true);
+            expect(results[0].message).toContain("AST is unavailable");
         });
     });
 });

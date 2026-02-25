@@ -1,4 +1,14 @@
 # TODO
+## 当前最高优先级（P0）
+- [x] 通过命令行完成 resource-doc workflow 的资源检查。
+    - 命令：`code-check resource-doc <file_path>`
+- [x] 规范检查结果类型，明确各属性的必填与选填要求。
+- [x] 调整各个规则的检查结果输出，确保符合统一结果标准。
+    - [x] 通过的规则需要展示一下被匹配的代码位置
+    - [x] 未通过的规则需要展示全部的 Result 信息
+    - 到这里就具备能够人工介入的黑盒调试能力了
+- [ ] 校验所有检查规则，补充测试样例并迭代到符合预期。
+
 - [] 需要考虑一下链式接口的扩展问题，设计问题
 - [] 怎样检查这种描述的问题呢？
     - 存在多种规范性的描述
@@ -68,16 +78,27 @@
 - [x] 修改入口目标，使其能够进行测试
     - 1. 打开到 package 目录下
     - 2. pnpm cli -- resource-doc ${file_path}
+- [x] 收集规则样例，实现 `意图文本规范化` 功能
+- [] 重构 `意图文本规范化` 代码，这部分代码的结构不行
+- [] 编写资源的解析逻辑
+- [x] 添加一个 cli 接口, `code-check ${workflow_name} ${file_path}`
 
 ## 测试命令
-- 查看支持的工作流 `code-check list workflow`
-- 使用某个工作流检查资源 `code-check ${workflow_name} ${resource_name}`
+- 查看支持的工作流
+    - `code-check list workflow`
+    - `pnpm cli -- list workflow`
+- 使用某个工作流检查资源
+    - `code-check ${workflow_name} ${file_path}`
+    - `pnpm cli -- ${workflow_name} ${file_path}`
+    - 示例 `code-check resource-doc ../../xxx.md`
+- `workflow_name` 请使用 `code-check list workflow` 返回的 id
 - 获取某个 markdown 文档的 ast 结构 `npx tsx .../scripts/parse-markdown.ts`
 
 ## 设计思考
 1. 先进行核心功能的实现
 2. 一个能不影响核心功能的实现就可以不做
 3. 现在只实现 cmd 的交互，通过命令来执行一个具体的检查，解决问题才是关键
+4. 实现和优化分开，在平常的时候先注重功能实现，后面有大段的时间可以进行优化
 
 ## 技术细节
 1. ast pattern 负责结构匹配

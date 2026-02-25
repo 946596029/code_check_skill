@@ -1,0 +1,30 @@
+PS C:\Users\Administrator\Desktop\code_check_skill> pnpm cli -- resource-doc C:\Users\Administrator\Desktop\code_check_skill\packages\core-test\scripts\apig_channel_member.md
+
+> code-check-skill@1.0.0 cli C:\Users\Administrator\Desktop\code_check_skill
+> node packages/cli/dist/index.js "--" "resource-doc" "C:\\Users\\Administrator\\Desktop\\code_check_skill\\packages\\core-test\\scripts\\apig_channel_member.md"
+
+
+File:     C:\\Users\\Administrator\\Desktop\\code_check_skill\\packages\\core-test\\scripts\\apig_channel_member.md
+Workflow: resource-doc
+
+────────────────────────────────────────────────────────────
+  ✗ FAIL  argument-reference-structure
+          Argument Reference section must consist of one or more bullet lists, each optionally followed by a paragraph
+
+    → Argument `port` description appears to use a standard constraint intent, but the intent cannot be classified. Please rewrite it using a standard sentence template.
+
+    → Argument `member_ip_address` description appears to use a standard constraint intent, but the intent cannot be classified. Please rewrite it using a standard sentence template.
+
+    → Argument `ecs_id` description appears to use a standard constraint intent, but the intent cannot be classified. Please rewrite it using a standard sentence template.
+
+    → Argument `ecs_name` description appears to use a standard constraint intent, but the intent cannot be classified. Please rewrite it using a standard sentence template.
+
+    → Argument `status` description appears to use a standard constraint intent, but the intent cannot be classified. Please rewrite it using a standard sentence template.
+
+    → Argument `is_backup` description appears to use a standard constraint intent, but the intent cannot be classified. Please rewrite it using a standard sentence template.
+
+────────────────────────────────────────────────────────────
+
+Summary: 5 rules, 4 passed, 1 failed
+
+ ELIFECYCLE  Command failed with exit code 1.

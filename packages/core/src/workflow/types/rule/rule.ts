@@ -1,4 +1,5 @@
 import { Context } from "../../context/context";
+import type { SourceRange } from "../../../tools/ast-parser/markdown";
 
 export class RuleCheckResult {
 
@@ -7,23 +8,52 @@ export class RuleCheckResult {
     public original: string;
     public suggested: string;
     public children: RuleCheckResult[];
+    public range?: SourceRange;
 
     public constructor(
         success: boolean,
         message: string,
         original: string,
         suggested: string,
-        children: RuleCheckResult[] = []
+        children: RuleCheckResult[] = [],
+        range?: SourceRange
     ) {
         this.success = success;
         this.message = message;
         this.original = original;
         this.suggested = suggested;
         this.children = children;
+        this.range = range;
     }
 
     static aggregate(children: RuleCheckResult[]): RuleCheckResult {
         return new RuleCheckResult(true, "", "", "", children);
+    }
+
+    static pass(
+        message: string,
+        range?: SourceRange,
+        original: string = "",
+        suggested?: string,
+        children: RuleCheckResult[] = []
+    ): RuleCheckResult {
+        const normalizedSuggested = suggested ?? original;
+        return new RuleCheckResult(
+            true,
+            message,
+            original,
+            normalizedSuggested,
+            children,
+            range
+        );
+    }
+
+    static fromLine(line?: number): SourceRange | undefined {
+        if (!line || line <= 0) return undefined;
+        return {
+            start: { line, column: 1 },
+            end: { line, column: 1 },
+        };
     }
 
     /**
@@ -112,13 +142,16 @@ export abstract class Rule {
         key: string,
         original: string,
         suggested?: string,
+        range?: SourceRange,
         ...args: unknown[]
     ): RuleCheckResult {
         return new RuleCheckResult(
             false,
             this.msg(key, ...args),
             original,
-            suggested ?? original
+            suggested ?? original,
+            [],
+            range
         );
     }
 

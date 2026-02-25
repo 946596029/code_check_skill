@@ -10,8 +10,10 @@ import { DefaultResourceResolver } from "./resolver/resource-resolver";
 const USAGE = `
 Usage:
   code-check <file.md>                  Check a Markdown file (auto-detect workflow)
-  code-check <workflow> <file>          Run a specific workflow on a file
+  code-check <workflow_name> <file_path>  Run a specific workflow on a file
+                                         Example: code-check resource-doc ./docs/resource.md
   code-check list workflow              List available workflows
+                                         Use this command to discover valid workflow_name values
 `;
 
 const WORKFLOW_BY_EXT: Record<string, string> = {
@@ -24,7 +26,8 @@ function inferWorkflow(filePath: string): string | undefined {
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  const args = rawArgs[0] === "--" ? rawArgs.slice(1) : rawArgs;
 
   if (args.length === 0) {
     console.log(USAGE);
@@ -42,7 +45,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (args.length >= 2) {
+  if (args.length === 2) {
     const [workflowId, resourcePath] = args;
     await checkCommand(checker, resolver, workflowId, resourcePath);
     return;
@@ -61,6 +64,13 @@ async function main(): Promise<void> {
     }
     await checkCommand(checker, resolver, workflowId, filePath);
     return;
+  }
+
+  if (args.length > 2) {
+    console.error(`Invalid arguments: ${args.join(" ")}`);
+    console.error("Expected exactly: code-check <workflow_name> <file_path>");
+    console.log(USAGE);
+    process.exit(1);
   }
 
   console.error(`Unknown command: ${args.join(" ")}`);

@@ -1,4 +1,5 @@
 import type { MarkdownNode } from "../../../../tools/ast-parser/markdown";
+import { MarkdownParser } from "../../../../tools/ast-parser/markdown";
 import {
     NodePattern,
     heading,
@@ -70,6 +71,8 @@ function matchesFully(
 }
 
 export class ExampleUsageStructureRule extends Rule {
+    private readonly parser = new MarkdownParser();
+
     constructor() {
         super(META, "code");
     }
@@ -79,9 +82,12 @@ export class ExampleUsageStructureRule extends Rule {
         ast?: unknown,
         _parentCtx?: unknown
     ): Promise<RuleCheckResult[]> {
-        if (!ast) return [];
+        if (!ast) {
+            return [RuleCheckResult.pass("AST is unavailable, rule skipped")];
+        }
 
         const doc = ast as MarkdownNode;
+        const sectionText = this.parser.getSectionText(code, 2, "Example Usage");
         const failures = await sectionCheck("Example Usage", 2)
             .validate((section) => {
                 const nodes = section.nodes;
@@ -122,8 +128,24 @@ export class ExampleUsageStructureRule extends Rule {
             })
             .run(doc, code);
 
+        if (failures.length === 0) {
+            return [
+                RuleCheckResult.pass(
+                    "Example Usage section structure is valid",
+                    RuleCheckResult.fromLine(sectionText?.startLine)
+                ),
+            ];
+        }
+
         return failures.map(
-            (failure) => new RuleCheckResult(false, failure.message, code, code)
+            (failure) => new RuleCheckResult(
+                false,
+                failure.message,
+                code,
+                code,
+                [],
+                RuleCheckResult.fromLine(failure.line)
+            )
         );
     }
 }

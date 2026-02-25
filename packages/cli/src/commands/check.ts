@@ -1,6 +1,5 @@
-import path from "path";
 import { CodeChecker } from "@code-check/core";
-import type { ResourceResolver } from "../resolver/resource-resolver";
+import { resolveResourcePath, type ResourceResolver } from "../resolver/resource-resolver";
 import { printReport } from "../reporter";
 
 export async function checkCommand(
@@ -10,7 +9,7 @@ export async function checkCommand(
   filePath: string
 ): Promise<void> {
   const code = await resolver.resolve(filePath);
-  const resolved = path.resolve(filePath);
+  const resolved = await resolveResourcePath(filePath);
 
   const report = await checker.check({ code, workflowId });
 

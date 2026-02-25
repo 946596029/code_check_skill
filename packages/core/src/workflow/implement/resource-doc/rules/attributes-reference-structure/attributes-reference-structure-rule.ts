@@ -1,4 +1,5 @@
 import type { MarkdownNode } from "../../../../../tools/ast-parser/markdown";
+import { MarkdownParser } from "../../../../../tools/ast-parser/markdown";
 import {
     NodePattern,
     nodeType,
@@ -48,6 +49,8 @@ const META: RuleMeta = {
 };
 
 export class AttributesReferenceStructureRule extends Rule {
+    private readonly parser = new MarkdownParser();
+
     constructor() {
         super(META, "code");
     }
@@ -57,17 +60,36 @@ export class AttributesReferenceStructureRule extends Rule {
         ast?: unknown,
         _parentCtx?: unknown
     ): Promise<RuleCheckResult[]> {
-        if (!ast) return [];
+        if (!ast) {
+            return [RuleCheckResult.pass("AST is unavailable, rule skipped")];
+        }
 
         const doc = ast as MarkdownNode;
+        const sectionText = this.parser.getSectionText(code, 2, "Attributes Reference");
         const failures = await sectionCheck("Attributes Reference", 2)
             .structure(SECTION_STRUCTURE)
             .introLine(EXPECTED_INTRO)
             .eachBulletItem((firstLine) => firstLine.matches(ATTR_BULLET_PATTERN))
             .run(doc, code);
 
+        if (failures.length === 0) {
+            return [
+                RuleCheckResult.pass(
+                    "Attributes Reference section structure is valid",
+                    RuleCheckResult.fromLine(sectionText?.startLine)
+                ),
+            ];
+        }
+
         return failures.map(
-            (failure) => new RuleCheckResult(false, failure.message, code, code)
+            (failure) => new RuleCheckResult(
+                false,
+                failure.message,
+                code,
+                code,
+                [],
+                RuleCheckResult.fromLine(failure.line)
+            )
         );
     }
 }

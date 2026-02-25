@@ -4,5 +4,8 @@ dist/
 *.js.map
 data/
 
+.vscode/
+.cursor/
+
 # Old web directory (locked native binaries, safe to delete manually)
 /web/

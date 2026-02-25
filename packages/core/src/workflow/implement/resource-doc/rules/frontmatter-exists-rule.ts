@@ -34,12 +34,18 @@ export class FrontmatterExistsRule extends Rule {
         }
 
         const doc = ast as MarkdownNode;
+        const frontmatterNode = this.parser.findFirst(
+            doc, (n) => n.type === "frontmatter"
+        );
 
-        if (this.parser.hasChild(
-            doc, (n) => n.type === "frontmatter", "first"
-        )) {
+        if (frontmatterNode) {
             this.storeFrontmatterInContext(doc, parentCtx);
-            return [];
+            return [
+                RuleCheckResult.pass(
+                    "Front matter block exists",
+                    frontmatterNode.sourceRange ?? undefined
+                ),
+            ];
         }
 
         const result = this.fail("missing", code);

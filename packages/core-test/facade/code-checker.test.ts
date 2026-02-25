@@ -202,7 +202,9 @@ describe("CodeChecker", () => {
         (r) => r.ruleName.toLowerCase().includes("frontmatter")
       );
       expect(frontmatterResult).toBeDefined();
-      expect(frontmatterResult!.results).toHaveLength(0);
+      expect(frontmatterResult!.results).toHaveLength(1);
+      expect(frontmatterResult!.results[0].success).toBe(true);
+      expect(frontmatterResult!.results[0].range).toBeDefined();
     });
   });
 });
