@@ -5,7 +5,8 @@
   "scripts": {
     "test": "cross-env NODE_OPTIONS=--max-old-space-size=4096 vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:llm:connect": "cross-env RUN_LLM_CONNECT_TEST=1 NODE_OPTIONS=--max-old-space-size=4096 vitest run scripts/llm_connect/llm-connect.test.ts"
   },
   "dependencies": {
     "@code-check/core": "workspace:*",

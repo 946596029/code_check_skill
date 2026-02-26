@@ -1,29 +1,14 @@
 import { ChatOpenAI } from "@langchain/openai";
+import { loadEnvFile } from "../env";
 
-/**
- * Create a Qwen model instance via DashScope OpenAI-compatible API.
- */
-export function createQwenModel(options?: { streaming?: boolean }): ChatOpenAI {
-    const modelName = process.env.QWEN_MODEL || "qwen-plus";
-    const streaming = options?.streaming ?? false;
-
-    return new ChatOpenAI({
-        modelName,
-        temperature: 0.7,
-        streaming,
-        configuration: {
-            baseURL: process.env.DASHSCOPE_BASE_URL,
-            apiKey: process.env.DASHSCOPE_API_KEY,
-        },
-    });
-}
+loadEnvFile();
 
 export function createModel(
-    modelName: string,
+    modelName: string = process.env.QWEN_MODEL || "qwen-plus",
     temperature: number = 0.7,
     streaming: boolean = false,
-    baseURL: string,
-    apiKey: string
+    baseURL: string = process.env.DASHSCOPE_BASE_URL || "",
+    apiKey: string = process.env.DASHSCOPE_API_KEY || ""
 ): ChatOpenAI {
     return new ChatOpenAI({
         modelName,

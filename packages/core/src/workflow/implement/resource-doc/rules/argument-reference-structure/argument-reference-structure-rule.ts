@@ -19,7 +19,7 @@ import {
     rest,
 } from "../../../../../tools/line-pattern";
 import { Rule, RuleCheckResult, RuleMeta } from "../../../../types/rule/rule";
-import { createQwenModel } from "../../../../../tools/llm";
+import { createModel } from "../../../../../tools/llm";
 import {
     DescriptionIntentDetector,
     getFormatSpec,
@@ -80,10 +80,29 @@ export class ArgumentReferenceStructureRule extends Rule {
 
     private getDetector(): DescriptionIntentDetector {
         if (!this.detector) {
-            const model = createQwenModel({ streaming: false });
+            const model = createModel();
             this.detector = new DescriptionIntentDetector(model);
         }
         return this.detector;
+    }
+
+    private getLinesForDetection(
+        argName: string,
+        lines: string[]
+    ): string[] {
+        return lines
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+            .filter((line) => !this.isBulletTemplateLine(line, argName));
+    }
+
+    private isBulletTemplateLine(line: string, argName: string): boolean {
+        const escapedName = argName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(
+            `^\\*?\\s*\`${escapedName}\`\\s*-\\s*\\([^)]*\\)\\s*Specifies\\b`,
+            "i"
+        );
+        return pattern.test(line);
     }
 
     public async test(
@@ -104,11 +123,16 @@ export class ArgumentReferenceStructureRule extends Rule {
             .introLine(EXPECTED_INTRO)
             .eachBulletItem((firstLine) => firstLine.matches(ARG_BULLET_PATTERN))
             .eachBulletItemAsync(async (item) => {
-                if (!item.descriptionText.trim()) return null;
+                const linesForDetection = this.getLinesForDetection(
+                    item.argName,
+                    item.descriptionLines
+                );
+                if (linesForDetection.length === 0) return null;
 
+                const textForDetection = linesForDetection.join("\n");
                 const detection = await detector.detect(
                     item.argName,
-                    item.descriptionText
+                    textForDetection
                 );
 
                 if (detection.status === "none") return null;
@@ -126,7 +150,7 @@ export class ArgumentReferenceStructureRule extends Rule {
                     const spec = getFormatSpec(intentResult.name);
                     if (!spec) continue;
 
-                    const validation = spec.validate(item.descriptionLines);
+                    const validation = spec.validate(linesForDetection);
                     if (validation.ok) continue;
 
                     return {

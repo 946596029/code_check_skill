@@ -68,6 +68,8 @@ export class DescriptionIntentDetector {
             SYSTEM_PROMPT,
             userPrompt
         );
+        
+        // console.log(result);
 
         if (!result.ok) {
             if (containsSuspiciousSignals(text)) {

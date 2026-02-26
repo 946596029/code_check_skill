@@ -10,7 +10,7 @@
  */
 
 export { StructuredCaller, extractJson } from "./structured-caller";
-export { createQwenModel, createModel } from "./model";
+export { createModel } from "./model";
 export type {
     StructuredCallerOptions,
     StructuredCallResult,

@@ -47,7 +47,8 @@ export type {
 export { DescriptionIntentClassifier } from "./workflow/implement/resource-doc/rules/argument-reference-structure";
 
 // ── LLM ──
-export { createQwenModel, createModel } from "./tools/llm";
+export { createModel } from "./tools/llm";
+export { loadEnvFile } from "./tools/env";
 
 // ── Structured LLM Calling ──
 export { StructuredCaller, extractJson } from "./tools/llm";
