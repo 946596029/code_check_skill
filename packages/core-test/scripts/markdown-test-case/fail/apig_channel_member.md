@@ -52,7 +52,7 @@ The following arguments are supported:
   attributes.
 
 * `port` - (Required, Int, NonUpdatable) Specifies the port number of the channel member.  
-  The valid value is range from `0` to `65,535`.
+  The valid value from `0` to `65,535`.
 
 * `member_ip_address` - (Optional, String) Specifies the IP address of the channel member.  
   The member_ip_address contain a maximum of `255` characters.
