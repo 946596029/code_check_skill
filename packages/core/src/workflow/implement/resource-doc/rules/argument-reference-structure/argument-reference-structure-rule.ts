@@ -105,6 +105,12 @@ export class ArgumentReferenceStructureRule extends Rule {
         return pattern.test(line);
     }
 
+    private hasExplicitDefaultValueMarker(lines: string[]): boolean {
+        return lines.some((line) =>
+            /\bdefault\s+value\b|\bdefaults?\s+to\b/i.test(line)
+        );
+    }
+
     public async test(
         code: string,
         ast?: unknown,
@@ -147,6 +153,13 @@ export class ArgumentReferenceStructureRule extends Rule {
                 }
 
                 for (const intentResult of detection.intents) {
+                    if (
+                        intentResult.name === "default-value" &&
+                        !this.hasExplicitDefaultValueMarker(linesForDetection)
+                    ) {
+                        continue;
+                    }
+
                     const spec = getFormatSpec(intentResult.name);
                     if (!spec) continue;
 
