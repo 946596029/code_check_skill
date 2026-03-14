@@ -64,11 +64,23 @@ export { Context } from "./workflow/context/context";
 
 // ── AST Parsers ──
 export { MarkdownParser } from "./tools/ast-parser/markdown";
-export { GoParser, TerraformSchemaExtractor } from "./tools/ast-parser/go";
+export {
+    GoParser,
+    TerraformSchemaExtractor,
+    TerraformSchemaSemanticNormalizer,
+} from "./tools/ast-parser/go";
 export type {
+    ForceNewSemantics,
+    ImportableSemantics,
+    ResourceSemantics,
     SchemaField,
     SchemaFieldType,
+    SemanticConfidence,
+    ResourceOptions,
     ResourceSchema,
+    ResourceTimeoutSemantics,
+    ResourceTimeouts,
+    TimeoutSemanticValue,
 } from "./tools/ast-parser/go";
 
 // ── Text Search ──

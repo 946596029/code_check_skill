@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
 import { GoParser, TerraformSchemaExtractor } from "@code-check/core";
 import type { ResourceSchema, SchemaField } from "@code-check/core";
 
@@ -88,6 +89,45 @@ func dataSourceApigApis() *schema.Resource {
     }
 }
 `;
+
+const RESOURCE_OPTIONS_SOURCE = `
+package huaweicloud
+
+import (
+    "time"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+)
+
+func resourceWithOptions() *schema.Resource {
+    return &schema.Resource{
+        DeprecationMessage: "resource is deprecated",
+        Importer: &schema.ResourceImporter{
+            StateContext: schema.ImportStatePassthroughContext,
+        },
+        CustomizeDiff: forceNewOnFields("instance_id"),
+        Timeouts: &schema.ResourceTimeout{
+            Create: schema.DefaultTimeout(10 * time.Minute),
+            Read: schema.DefaultTimeout(5 * time.Minute),
+            Update: schema.DefaultTimeout(30 * time.Minute),
+            Delete: schema.DefaultTimeout(15 * time.Minute),
+        },
+        Schema: map[string]*schema.Schema{
+            "name": {
+                Type:     schema.TypeString,
+                Required: true,
+            },
+        },
+    }
+}
+`;
+
+const HUAWEICLOUD_CHANNEL_MEMBER_GROUP_SOURCE = readFileSync(
+    new URL(
+        "../../terraform_provider_example/resource_huaweicloud_apig_channel_member_group.go",
+        import.meta.url
+    ),
+    "utf8"
+);
 
 describe("TerraformSchemaExtractor", () => {
     let parser: GoParser;
@@ -243,6 +283,35 @@ func resourceEmpty() *schema.Resource {
             const schemas = extractor.extract(source);
             expect(schemas).toHaveLength(1);
             expect(schemas[0].fields).toEqual([]);
+        });
+    });
+
+    describe("resource-level options", () => {
+        it("should extract timeouts/importer/customizediff/deprecation", () => {
+            const schemas = extractor.extract(RESOURCE_OPTIONS_SOURCE);
+            expect(schemas).toHaveLength(1);
+            const resource = schemas[0];
+            const options = resource.resourceOptions;
+            expect(options).toBeDefined();
+            expect(options!.hasImporter).toBe(true);
+            expect(options!.importerStateContext).toBe("schema.ImportStatePassthroughContext");
+            expect(options!.customizeDiff).toBe('forceNewOnFields("instance_id")');
+            expect(options!.deprecationMessage).toBe("resource is deprecated");
+            expect(options!.timeouts).toEqual({
+                create: "schema.DefaultTimeout(10 * time.Minute)",
+                read: "schema.DefaultTimeout(5 * time.Minute)",
+                update: "schema.DefaultTimeout(30 * time.Minute)",
+                delete: "schema.DefaultTimeout(15 * time.Minute)",
+            });
+        });
+
+        it("should extract importer/customizediff from real provider resource", () => {
+            const schemas = extractor.extract(HUAWEICLOUD_CHANNEL_MEMBER_GROUP_SOURCE);
+            const resource = schemas.find((s) => s.functionName === "ResourceChannelMemberGroup");
+            expect(resource).toBeDefined();
+            expect(resource!.resourceOptions?.hasImporter).toBe(true);
+            expect(resource!.resourceOptions?.customizeDiff).toContain("config.FlexibleForceNew");
+            expect(resource!.resourceOptions?.timeouts).toBeUndefined();
         });
     });
 });

@@ -1,6 +1,12 @@
 import { GoParser } from "./parser";
 import type { SyntaxNode } from "./parser";
-import type { ResourceSchema, SchemaField, SchemaFieldType } from "./types";
+import type {
+    ResourceOptions,
+    ResourceSchema,
+    ResourceTimeouts,
+    SchemaField,
+    SchemaFieldType,
+} from "./types";
 
 /**
  * Mapping from `schema.Type*` selector expressions to our SchemaFieldType.
@@ -84,39 +90,73 @@ export class TerraformSchemaExtractor {
         const body = fn.childForFieldName("body");
         if (!body) return null;
 
-        const schemaMap = this.findSchemaMap(body);
+        const resourceLiteral = this.findResourceLiteral(body);
+        if (!resourceLiteral) return null;
+
+        const schemaMap = this.findSchemaMap(resourceLiteral);
         if (!schemaMap) return null;
 
         const fields = this.extractFieldsFromMap(schemaMap);
+        const resourceOptions = this.extractResourceOptions(resourceLiteral);
 
         return {
             resourceName: this.inferResourceName(funcName),
             functionName: funcName,
             fields,
+            resourceOptions,
         };
     }
 
     /**
-     * Locate the `Schema: map[string]*schema.Schema{ ... }` composite
-     * literal value within a function body.
-     *
-     * In tree-sitter-go, keyed_element children are:
-     *   keyed_element -> literal_element (key) + literal_element (value)
+     * Locate the returned `&schema.Resource{ ... }` composite literal
+     * in a function body.
      */
-    private findSchemaMap(body: SyntaxNode): SyntaxNode | null {
-        const keyedElements = this.parser.findByType(body, "keyed_element");
+    private findResourceLiteral(body: SyntaxNode): SyntaxNode | null {
+        const literals = this.parser.findByType(body, "composite_literal");
+        for (const literal of literals) {
+            if (!this.isResourceCompositeLiteral(literal)) continue;
+            const schemaMap = this.findSchemaMap(literal);
+            if (!schemaMap) continue;
+            return literal;
+        }
+        return null;
+    }
 
-        for (const ke of keyedElements) {
-            const children = nonNullChildren(ke);
-            if (children.length < 2) continue;
+    /**
+     * Locate the `Schema: map[string]*schema.Schema{ ... }` value from
+     * a resource composite literal.
+     */
+    private findSchemaMap(resourceLiteral: SyntaxNode): SyntaxNode | null {
+        const valueNode = this.findTopLevelValueByKey(resourceLiteral, "Schema");
+        if (!valueNode) return null;
+        if (this.isSchemaMapLiteral(valueNode)) return valueNode;
+        return null;
+    }
 
-            const keyNode = unwrap(children[0]);
-            if (keyNode.text !== "Schema") continue;
+    private isResourceCompositeLiteral(node: SyntaxNode): boolean {
+        const typeNode = node.childForFieldName("type");
+        if (!typeNode) return false;
+        const typeText = typeNode.text;
+        return typeText === "schema.Resource" || typeText === "*schema.Resource";
+    }
 
-            const valueNode = unwrap(children[1]);
-            if (this.isSchemaMapLiteral(valueNode)) {
-                return valueNode;
-            }
+    /**
+     * Find a top-level keyed value from a composite literal body by key.
+     */
+    private findTopLevelValueByKey(
+        compositeLiteral: SyntaxNode,
+        targetKey: string
+    ): SyntaxNode | null {
+        const body = compositeLiteral.childForFieldName("body");
+        if (!body) return null;
+
+        for (const child of nonNullChildren(body)) {
+            if (child.type !== "keyed_element") continue;
+            const keyedChildren = nonNullChildren(child);
+            if (keyedChildren.length < 2) continue;
+            const key = unwrap(keyedChildren[0]);
+            if (key.text !== targetKey) continue;
+            return unwrap(keyedChildren[1]);
         }
 
         return null;
@@ -278,6 +318,108 @@ export class TerraformSchemaExtractor {
                 field.subFields = this.extractFieldsFromMap(schemaMap);
             }
         }
+    }
+
+    private extractResourceOptions(resourceLiteral: SyntaxNode): ResourceOptions {
+        const options: ResourceOptions = {
+            hasImporter: false,
+        };
+
+        const importerNode = this.findTopLevelValueByKey(resourceLiteral, "Importer");
+        if (importerNode && importerNode.text !== "nil") {
+            options.hasImporter = true;
+            const stateContext = this.extractImporterStateContext(importerNode);
+            if (stateContext) {
+                options.importerStateContext = stateContext;
+            }
+        }
+
+        const customizeDiffNode = this.findTopLevelValueByKey(resourceLiteral, "CustomizeDiff");
+        if (customizeDiffNode) {
+            options.customizeDiff = customizeDiffNode.text;
+        }
+
+        const deprecationNode = this.findTopLevelValueByKey(resourceLiteral, "DeprecationMessage");
+        if (deprecationNode) {
+            options.deprecationMessage = this.extractStringLiteral(deprecationNode) ?? deprecationNode.text;
+        }
+
+        const timeoutsNode = this.findTopLevelValueByKey(resourceLiteral, "Timeouts");
+        if (timeoutsNode) {
+            const timeouts = this.extractTimeouts(timeoutsNode);
+            if (timeouts) {
+                options.timeouts = timeouts;
+            }
+        }
+
+        return options;
+    }
+
+    private extractImporterStateContext(importerNode: SyntaxNode): string | undefined {
+        let node = importerNode;
+        if (node.type === "unary_expression") {
+            const operand = node.childForFieldName("operand");
+            if (!operand) return undefined;
+            node = operand;
+        }
+
+        if (node.type !== "composite_literal") return undefined;
+        const typeNode = node.childForFieldName("type");
+        if (!typeNode) return undefined;
+        const typeText = typeNode.text;
+        if (typeText !== "schema.ResourceImporter" && typeText !== "*schema.ResourceImporter") {
+            return undefined;
+        }
+
+        const stateContextNode = this.findTopLevelValueByKey(node, "StateContext");
+        if (stateContextNode) return stateContextNode.text;
+
+        const stateNode = this.findTopLevelValueByKey(node, "State");
+        if (stateNode) return stateNode.text;
+
+        return undefined;
+    }
+
+    private extractTimeouts(timeoutsNode: SyntaxNode): ResourceTimeouts | undefined {
+        let node = timeoutsNode;
+        if (node.type === "unary_expression") {
+            const operand = node.childForFieldName("operand");
+            if (!operand) return undefined;
+            node = operand;
+        }
+
+        if (node.type !== "composite_literal") return undefined;
+        const typeNode = node.childForFieldName("type");
+        if (!typeNode) return undefined;
+        const typeText = typeNode.text;
+        if (typeText !== "schema.ResourceTimeout" && typeText !== "*schema.ResourceTimeout") {
+            return undefined;
+        }
+
+        const timeouts: ResourceTimeouts = {};
+        const mapping: Record<string, keyof ResourceTimeouts> = {
+            Create: "create",
+            Read: "read",
+            Update: "update",
+            Delete: "delete",
+            Default: "default",
+        };
+
+        const body = node.childForFieldName("body");
+        if (!body) return undefined;
+        for (const child of nonNullChildren(body)) {
+            if (child.type !== "keyed_element") continue;
+            const keyedChildren = nonNullChildren(child);
+            if (keyedChildren.length < 2) continue;
+            const keyNode = unwrap(keyedChildren[0]);
+            const valueNode = unwrap(keyedChildren[1]);
+            const mapped = mapping[keyNode.text];
+            if (!mapped) continue;
+            timeouts[mapped] = valueNode.text;
+        }
+
+        if (Object.keys(timeouts).length === 0) return undefined;
+        return timeouts;
     }
 
     /**

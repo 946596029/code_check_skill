@@ -59,4 +59,90 @@ export interface ResourceSchema {
 
     /** All top-level schema fields */
     fields: SchemaField[];
+
+    /**
+     * Resource-level options extracted from `&schema.Resource{ ... }`,
+     * such as Timeouts, Importer, and CustomizeDiff.
+     */
+    resourceOptions?: ResourceOptions;
+
+    /**
+     * Optional normalized semantic view derived from raw resource options.
+     * This is best-effort and keeps conservative confidence signals.
+     */
+    resourceSemantics?: ResourceSemantics;
+}
+
+/**
+ * Timeout expressions configured on `schema.ResourceTimeout`.
+ * Values are kept as raw Go expressions for compatibility.
+ */
+export interface ResourceTimeouts {
+    create?: string;
+    read?: string;
+    update?: string;
+    delete?: string;
+    default?: string;
+}
+
+/**
+ * Resource-level capabilities/metadata extracted from a schema resource.
+ */
+export interface ResourceOptions {
+    /** Whether an Importer block is configured. */
+    hasImporter: boolean;
+
+    /**
+     * Importer state handler expression (for example
+     * `schema.ImportStatePassthroughContext`), if present.
+     */
+    importerStateContext?: string;
+
+    /** Raw expression assigned to CustomizeDiff. */
+    customizeDiff?: string;
+
+    /** Deprecation message from DeprecationMessage field. */
+    deprecationMessage?: string;
+
+    /** Parsed timeout expressions from Timeouts block. */
+    timeouts?: ResourceTimeouts;
+}
+
+/** Confidence levels for conservative semantic derivation. */
+export type SemanticConfidence = "high" | "none";
+
+/** Normalized timeout semantic value with raw fallback and confidence. */
+export interface TimeoutSemanticValue {
+    raw: string;
+    milliseconds?: number;
+    confidence: SemanticConfidence;
+}
+
+/** Semantic projection of timeout settings. */
+export interface ResourceTimeoutSemantics {
+    create?: TimeoutSemanticValue;
+    read?: TimeoutSemanticValue;
+    update?: TimeoutSemanticValue;
+    delete?: TimeoutSemanticValue;
+    default?: TimeoutSemanticValue;
+}
+
+/** Semantic projection for force-new behavior inferred from CustomizeDiff. */
+export interface ForceNewSemantics {
+    fields: string[];
+    confidence: SemanticConfidence;
+    source: "customizeDiff";
+}
+
+/** Semantic projection for import capability. */
+export interface ImportableSemantics {
+    value: boolean;
+    confidence: "high";
+}
+
+/** Consolidated semantic view for a resource schema. */
+export interface ResourceSemantics {
+    importable?: ImportableSemantics;
+    timeouts?: ResourceTimeoutSemantics;
+    forceNew?: ForceNewSemantics;
 }
