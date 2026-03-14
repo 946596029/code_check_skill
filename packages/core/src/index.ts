@@ -15,7 +15,14 @@ export type { RuleMeta, MessageTemplate } from "./workflow/types/rule/rule";
 
 // ── Workflow ──
 export { Workflow, LifeCycle } from "./workflow/workflow";
-export type { RuleResult, OnRuleComplete } from "./workflow/workflow";
+export type {
+    RuleResult,
+    OnRuleComplete,
+    WorkflowStage,
+    WorkflowStageRuntime,
+    RunRulesOptions,
+    RuleExecutionStrategy,
+} from "./workflow/workflow";
 export { ResourceDocWorkflow } from "./workflow/implement/resource-doc/resource-doc-workflow";
 export {
     FrontmatterExistsRule,

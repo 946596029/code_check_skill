@@ -3,18 +3,21 @@
  * Rules share data via these keys to avoid re-parsing and enable cross-rule coordination.
  */
 
+/** Parsed Markdown AST for the current document */
+export const CTX_MARKDOWN_AST = "resource-doc.stage.markdownAst";
+
 /** Parsed frontmatter object (page_title, description, etc.) */
-export const CTX_FRONTMATTER = "resource-doc.frontmatter";
+export const CTX_FRONTMATTER = "resource-doc.stage.frontmatter";
 
 /** Resource name extracted from frontmatter page_title (e.g. "aws_instance") */
-export const CTX_RESOURCE_NAME = "resource-doc.resourceName";
+export const CTX_RESOURCE_NAME = "resource-doc.stage.resourceName";
 
 /** Expected description from frontmatter, normalized for comparison */
-export const CTX_EXPECTED_DESCRIPTION = "resource-doc.expectedDescription";
+export const CTX_EXPECTED_DESCRIPTION = "resource-doc.stage.expectedDescription";
 
 /** Actual H1 title text extracted from AST */
-export const CTX_H1_TITLE = "resource-doc.h1Title";
+export const CTX_H1_TITLE = "resource-doc.rule.h1Title";
 
 /** Description text content under the H1 paragraph node */
-export const CTX_H1_DESC_TEXT = "resource-doc.h1DescText";
+export const CTX_H1_DESC_TEXT = "resource-doc.rule.h1DescText";
 

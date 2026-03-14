@@ -7,6 +7,7 @@ import {
   ResourceDocWorkflow,
 } from "@code-check/core";
 import type { Context } from "@code-check/core";
+import type { WorkflowStage } from "@code-check/core";
 
 class NoTodoRule extends Rule {
   private readonly pattern = /TODO/i;
@@ -58,11 +59,67 @@ class SimpleWorkflow extends Workflow {
     this.setRules([new NoTodoRule(), new AlwaysPassRule()]);
   }
 
-  public preprocess(): void {
-    this.code = this.code.trim();
+  protected defineStages(): WorkflowStage[] {
+    return [
+      {
+        id: "normalize",
+        description: "Trim input code",
+        execute: async (runtime) => {
+          runtime.updateCode(runtime.code.trim());
+        },
+      },
+      this.createRuleExecutionStage(),
+    ];
+  }
+}
+
+const CTX_TEST_ARTIFACT = "test.stage.artifact";
+
+class ExpectArtifactRule extends Rule {
+  constructor() {
+    super({
+      name: "expect-artifact",
+      description: "Ensures stage artifact is visible to rules",
+      messages: {
+        missing: "Expected artifact is missing from context",
+      },
+    });
   }
 
-  public postprocess(): void {}
+  public async test(
+    _code: string,
+    _ast?: unknown,
+    parentCtx?: Context
+  ): Promise<RuleCheckResult[]> {
+    const value = parentCtx?.get<string>(CTX_TEST_ARTIFACT);
+    if (value !== "ready") {
+      return [this.fail("missing", "", "")];
+    }
+    return [RuleCheckResult.pass("Artifact is available in rule context")];
+  }
+}
+
+class ArtifactWorkflow extends Workflow {
+  public readonly id = "artifact-workflow";
+  public readonly description = "Workflow with stage artifacts";
+
+  constructor() {
+    super();
+    this.setRules([new ExpectArtifactRule()]);
+  }
+
+  protected defineStages(): WorkflowStage[] {
+    return [
+      {
+        id: "seed-artifact",
+        description: "Seed context artifact",
+        execute: async (runtime) => {
+          runtime.setArtifact(CTX_TEST_ARTIFACT, "ready");
+        },
+      },
+      this.createRuleExecutionStage(),
+    ];
+  }
 }
 
 describe("CodeChecker", () => {
@@ -160,6 +217,24 @@ describe("CodeChecker", () => {
       for (const ruleResult of report.results) {
         expect(ruleResult.results).toHaveLength(0);
       }
+    });
+  });
+
+  describe("stage artifact flow", () => {
+    beforeEach(() => {
+      checker.registerWorkflow(new ArtifactWorkflow());
+    });
+
+    it("should allow rules to read stage artifacts from context keys", async () => {
+      const report = await checker.check({
+        code: "const x = 1;",
+        workflowId: "artifact-workflow",
+      });
+
+      expect(report.results).toHaveLength(1);
+      expect(report.results[0].ruleName).toBe("expect-artifact");
+      expect(report.results[0].results).toHaveLength(1);
+      expect(report.results[0].results[0].success).toBe(true);
     });
   });
 
