@@ -1,6 +1,6 @@
 import { Rule, RuleCheckResult, type RuleMeta } from "../../../../types/rule/rule";
 import type { Context } from "../../../../context/context";
-import type { SchemaSemanticView, DocStructure, DocAttribute } from "../../types";
+import type { SchemaSemanticView, DocStructure, DocAttribute, SemanticField } from "../../types";
 import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_STRUCTURE } from "../../context-keys";
 
 const META: RuleMeta = {
@@ -13,6 +13,9 @@ const META: RuleMeta = {
             `Attribute "${name}" is defined in schema but missing from the document.`,
         extraInDoc: (name: unknown, line: unknown) =>
             `Attribute "${name}" (line ${line}) is documented but not found in the schema.`,
+        descriptionMismatch: (name: unknown, expected: unknown, actual: unknown, line: unknown) =>
+            `Attribute "${name}" (line ${line}): description should be "${expected}" ` +
+            `but found "${actual}".`,
     },
 };
 
@@ -50,6 +53,7 @@ export class AttributeSectionSemanticRule extends Rule {
         const failures: RuleCheckResult[] = [];
 
         this.checkCompleteness(docAttrs, view, failures);
+        this.checkDescriptionAlignment(docAttrs, view, failures);
 
         if (failures.length === 0) {
             return [RuleCheckResult.pass("Attribute section semantic checks passed")];
@@ -90,6 +94,38 @@ export class AttributeSectionSemanticRule extends Rule {
                         undefined,
                         RuleCheckResult.fromLine(attr.startLine),
                         attr.name,
+                        attr.startLine,
+                    ),
+                );
+            }
+        }
+    }
+
+    private checkDescriptionAlignment(
+        docAttrs: DocAttribute[],
+        view: SchemaSemanticView,
+        failures: RuleCheckResult[],
+    ): void {
+        for (const attr of docAttrs) {
+            const field = view.attributes.get(attr.name);
+            if (!field || !field.description) continue;
+
+            const expected = field.description.trim();
+            const actual = attr.descriptionText.trim();
+            if (expected && actual !== expected) {
+                const previewLen = Math.min(expected.length + 20, 80);
+                const actualPreview = actual.length > previewLen
+                    ? actual.slice(0, previewLen) + "..."
+                    : actual;
+                failures.push(
+                    this.fail(
+                        "descriptionMismatch",
+                        "",
+                        undefined,
+                        RuleCheckResult.fromLine(attr.startLine),
+                        attr.name,
+                        expected,
+                        actualPreview,
                         attr.startLine,
                     ),
                 );

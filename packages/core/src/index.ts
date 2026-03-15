@@ -39,8 +39,12 @@ export {
     FrontmatterCheckRule,
     LineLengthRule,
     NumberFormatRule,
+    BlankLineBetweenBlocksRule,
     H1ExistsRule,
     ExampleSectionExistsRule,
+    SectionExistenceRule,
+    ArgumentSectionSemanticRule,
+    AttributeSectionSemanticRule,
 } from "./workflow/implement/resource-check/rules";
 export type {
     ResourceCheckInput,

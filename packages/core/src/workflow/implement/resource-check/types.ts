@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import type { SchemaFieldType } from "../../../tools/ast-parser/go/types";
 
@@ -104,12 +105,33 @@ export interface ResolvedResourcePaths {
  * e.g. "terraform-provider-huaweicloud" -> "huaweicloud"
  */
 function inferProviderName(providerRoot: string): string {
-    const dirName = path.basename(path.resolve(providerRoot));
+    const root = path.resolve(providerRoot);
+    const dirName = path.basename(root);
     const prefix = "terraform-provider-";
     if (dirName.startsWith(prefix)) {
         return dirName.slice(prefix.length);
     }
+    // Prefer structural detection for fixtures/non-standard roots:
+    // <root>/<provider>/services/** or <root>/services/**.
+    const providerDirs = detectProviderDirs(root);
+    if (providerDirs.length === 1) {
+        return providerDirs[0];
+    }
     return dirName;
+}
+
+function detectProviderDirs(root: string): string[] {
+    if (!fs.existsSync(root)) return [];
+
+    if (fs.existsSync(path.join(root, "services"))) {
+        return [path.basename(root)];
+    }
+
+    const entries = fs.readdirSync(root, { withFileTypes: true });
+    return entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .filter((name) => fs.existsSync(path.join(root, name, "services")));
 }
 
 /**
@@ -171,6 +193,9 @@ export function resolveResourcePaths(input: ResourceCheckInput): ResolvedResourc
     const provider = inferProviderName(root);
     const fullName = buildFullResourceName(provider, input.resourceName);
     const shortName = stripProviderPrefix(provider, input.resourceName);
+    const providerBase = fs.existsSync(path.join(root, "services"))
+        ? root
+        : path.join(root, provider);
 
     const filePrefix = input.resourceType === "resource"
         ? `resource_${fullName}`
@@ -181,11 +206,11 @@ export function resolveResourcePaths(input: ResourceCheckInput): ResolvedResourc
         : "data-sources";
 
     const implementGoPath = path.join(
-        root, provider, "services", input.serviceName, `${filePrefix}.go`
+        providerBase, "services", input.serviceName, `${filePrefix}.go`
     );
 
     const testGoPath = path.join(
-        root, provider, "services", "acceptance", input.serviceName, `${filePrefix}_test.go`
+        providerBase, "services", "acceptance", input.serviceName, `${filePrefix}_test.go`
     );
 
     const docMdPath = path.join(root, "docs", docDir, `${shortName}.md`);

@@ -10,6 +10,7 @@ interface SectionExpectation {
     level: number;
     shouldExist: (view: SchemaSemanticView) => boolean;
     reason: (view: SchemaSemanticView) => string;
+    introLine?: string;
 }
 
 const SECTION_EXPECTATIONS: SectionExpectation[] = [
@@ -18,12 +19,14 @@ const SECTION_EXPECTATIONS: SectionExpectation[] = [
         level: 2,
         shouldExist: (v) => v.arguments.size > 0,
         reason: (v) => `schema has ${v.arguments.size} argument(s)`,
+        introLine: "The following arguments are supported:",
     },
     {
         title: "Attribute Reference",
         level: 2,
         shouldExist: (v) => v.attributes.size > 0,
         reason: (v) => `schema has ${v.attributes.size} attribute(s)`,
+        introLine: "In addition to all arguments above, the following attributes are exported:",
     },
     {
         title: "Timeouts",
@@ -48,6 +51,10 @@ const META: RuleMeta = {
             `Section "## ${title}" is missing but expected: ${reason}.`,
         unexpected: (title: unknown) =>
             `Section "## ${title}" exists but has no corresponding schema data.`,
+        introMismatch: (title: unknown, expected: unknown, actual: unknown) =>
+            `Section "## ${title}" intro line should be "${expected}" but found "${actual}".`,
+        introMissing: (title: unknown, expected: unknown) =>
+            `Section "## ${title}" is missing the required intro line: "${expected}".`,
     },
 };
 
@@ -102,6 +109,11 @@ export class SectionExistenceRule extends Rule {
                         expectation.title,
                     ),
                 );
+            } else if (expected && exists && expectation.introLine) {
+                const introResult = this.checkIntroLine(
+                    section!, expectation.title, expectation.introLine,
+                );
+                results.push(introResult);
             } else {
                 const label = expected ? "present as expected" : "absent as expected";
                 results.push(
@@ -113,5 +125,41 @@ export class SectionExistenceRule extends Rule {
         }
 
         return results;
+    }
+
+    private checkIntroLine(
+        sectionNodes: MarkdownNode[],
+        title: string,
+        expectedIntro: string,
+    ): RuleCheckResult {
+        const firstParagraph = sectionNodes.find((n) => n.type === "paragraph");
+        if (!firstParagraph) {
+            return this.fail(
+                "introMissing",
+                "",
+                undefined,
+                undefined,
+                title,
+                expectedIntro,
+            );
+        }
+
+        const actualText = this.parser.getTextContent(firstParagraph).trim();
+        if (actualText === expectedIntro) {
+            return RuleCheckResult.pass(
+                `Section "## ${title}" is present with correct intro line`,
+            );
+        }
+
+        const startLine = firstParagraph.sourceRange?.start.line;
+        return this.fail(
+            "introMismatch",
+            "",
+            undefined,
+            RuleCheckResult.fromLine(startLine),
+            title,
+            expectedIntro,
+            actualText,
+        );
     }
 }

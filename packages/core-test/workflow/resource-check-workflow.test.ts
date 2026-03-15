@@ -10,12 +10,21 @@ import {
     GoParser,
     TerraformSchemaExtractor,
     TerraformSchemaSemanticNormalizer,
+    SectionExistenceRule,
+    ArgumentSectionSemanticRule,
+    AttributeSectionSemanticRule,
+    MarkdownParser,
+    RuleCheckResult,
+    Context,
 } from "@code-check/core";
 import type {
     ResourceCheckInput,
     CheckReport,
     DocStructure,
+    DocArgument,
+    DocAttribute,
     SchemaSemanticView,
+    SemanticField,
     ResourceSchema,
 } from "@code-check/core";
 
@@ -80,13 +89,14 @@ describe("resolveResourcePaths", () => {
         expect(paths.implementGoPath).toContain("services");
         expect(paths.implementGoPath).toContain("apig");
         expect(paths.implementGoPath).toMatch(
-            /resource_terraform_provider_example_apig_channel_member\.go$/
+            /resource_huaweicloud_apig_channel_member\.go$/
         );
+        expect(paths.implementGoPath).toContain(path.join("huaweicloud", "services"));
         expect(paths.docMdPath).toContain(path.join("docs", "resources"));
         expect(paths.docMdPath).toMatch(/apig_channel_member\.md$/);
         expect(paths.testGoPath).toContain("acceptance");
         expect(paths.testGoPath).toMatch(
-            /resource_terraform_provider_example_apig_channel_member_test\.go$/
+            /resource_huaweicloud_apig_channel_member_test\.go$/
         );
     });
 
@@ -129,7 +139,7 @@ describe("ResourceCheckWorkflow", () => {
         expect(wf!.description).toContain("Staged checks");
     });
 
-    it("should run all 9 stages and produce results for real resource files", async () => {
+    it("should run semantic markdown rules for real resource files", async () => {
         const input = makeInput();
         const report = await checker.check({
             code: toCode(input),
@@ -145,7 +155,9 @@ describe("ResourceCheckWorkflow", () => {
         expect(names).toContain("md-number-format");
         expect(names).toContain("md-h1-exists");
         expect(names).toContain("md-example-section-exists");
-        expect(names).toContain("doc-semantic-check");
+        expect(names).toContain("section-existence");
+        expect(names).toContain("argument-section-semantic");
+        expect(names).toContain("attribute-section-semantic");
         expect(names).toContain("test-go-structured-check");
         expect(names).toContain("test-hcl-style-check");
     });
@@ -413,5 +425,542 @@ describe("buildSchemaSemanticView", () => {
         expect(view.attributes.has("id_field")).toBe(true);
         expect(view.timeouts).toBeNull();
         expect(view.importInfo.importable).toBe(false);
+    });
+});
+
+describe("ArgumentSectionSemanticRule", () => {
+    const CTX_SCHEMA_SEMANTIC_VIEW = "resource-check.stage.schemaSemanticView";
+    const CTX_DOC_STRUCTURE = "resource-check.stage.docStructure";
+
+    function makeField(overrides: Partial<SemanticField> = {}): SemanticField {
+        return {
+            name: "test_field",
+            type: "TypeString",
+            required: true,
+            optional: false,
+            computed: false,
+            forceNew: false,
+            nonUpdatable: false,
+            description: "The test field.",
+            ...overrides,
+        };
+    }
+
+    function makeView(args: Map<string, SemanticField>): SchemaSemanticView {
+        return {
+            resourceName: "test_resource",
+            arguments: args,
+            attributes: new Map(),
+            timeouts: null,
+            importInfo: { importable: false },
+        };
+    }
+
+    function makeDocArg(overrides: Partial<DocArgument> = {}): DocArgument {
+        return {
+            name: "test_field",
+            modifier: "Required",
+            type: "String",
+            tags: [],
+            descriptionText: "the test field.",
+            startLine: 10,
+            ...overrides,
+        };
+    }
+
+    function makeDocStructure(args: DocArgument[]): DocStructure {
+        return {
+            frontmatter: null,
+            resourceName: null,
+            expectedDescription: null,
+            arguments: args,
+            attributes: [],
+        };
+    }
+
+    function buildCtx(view: SchemaSemanticView, doc: DocStructure): Context {
+        const ctx = new Context();
+        ctx.set(CTX_SCHEMA_SEMANTIC_VIEW, view);
+        ctx.set(CTX_DOC_STRUCTURE, doc);
+        return ctx;
+    }
+
+    function collectFailureMessages(results: RuleCheckResult[]): string[] {
+        const messages: string[] = [];
+        for (const r of results) {
+            if (!r.success) {
+                messages.push(r.message);
+                if (r.children) {
+                    for (const child of r.children) {
+                        if (!child.success) messages.push(child.message);
+                    }
+                }
+            }
+        }
+        return messages;
+    }
+
+    it("should not report Computed tag as missing for computed+optional field", async () => {
+        const field = makeField({
+            name: "status",
+            required: false,
+            optional: true,
+            computed: true,
+            description: "The status.",
+        });
+        const view = makeView(new Map([["status", field]]));
+        const doc = makeDocStructure([
+            makeDocArg({
+                name: "status",
+                modifier: "Optional",
+                tags: [],
+                descriptionText: "the status.",
+            }),
+        ]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.every((m) => !m.includes("Computed"))).toBe(true);
+    });
+
+    it("should not report Computed tag as extra when doc includes it", async () => {
+        const field = makeField({
+            name: "status",
+            required: false,
+            optional: true,
+            computed: true,
+            description: "The status.",
+        });
+        const view = makeView(new Map([["status", field]]));
+        const doc = makeDocStructure([
+            makeDocArg({
+                name: "status",
+                modifier: "Optional",
+                tags: ["Computed"],
+                descriptionText: "the status.",
+            }),
+        ]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.every((m) => !m.includes("Computed"))).toBe(true);
+    });
+
+    it("should pass when description matches 'Specifies' + lowercased schema description", async () => {
+        const field = makeField({
+            name: "instance_id",
+            description: "The ID of the dedicated instance.",
+        });
+        const view = makeView(new Map([["instance_id", field]]));
+        const doc = makeDocStructure([
+            makeDocArg({
+                name: "instance_id",
+                descriptionText: "the ID of the dedicated instance.",
+            }),
+        ]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.every((m) => !m.includes("description"))).toBe(true);
+    });
+
+    it("should fail when description does not start with expected prefix", async () => {
+        const field = makeField({
+            name: "instance_id",
+            description: "The ID of the dedicated instance.",
+        });
+        const view = makeView(new Map([["instance_id", field]]));
+        const doc = makeDocStructure([
+            makeDocArg({
+                name: "instance_id",
+                descriptionText: "the identifier of the instance.",
+            }),
+        ]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("description should start with"))).toBe(true);
+    });
+
+    it("should lowercase only the first character of schema description", async () => {
+        const field = makeField({
+            name: "name",
+            description: "An unique name of the resource.",
+        });
+        const view = makeView(new Map([["name", field]]));
+        const doc = makeDocStructure([
+            makeDocArg({
+                name: "name",
+                descriptionText: "an unique name of the resource.",
+            }),
+        ]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.every((m) => !m.includes("description"))).toBe(true);
+    });
+});
+
+describe("AttributeSectionSemanticRule", () => {
+    const CTX_SCHEMA_SEMANTIC_VIEW = "resource-check.stage.schemaSemanticView";
+    const CTX_DOC_STRUCTURE = "resource-check.stage.docStructure";
+
+    function makeAttrField(overrides: Partial<SemanticField> = {}): SemanticField {
+        return {
+            name: "test_attr",
+            type: "TypeString",
+            required: false,
+            optional: false,
+            computed: true,
+            forceNew: false,
+            nonUpdatable: false,
+            description: "The test attribute.",
+            ...overrides,
+        };
+    }
+
+    function makeAttrView(attrs: Map<string, SemanticField>): SchemaSemanticView {
+        return {
+            resourceName: "test_resource",
+            arguments: new Map(),
+            attributes: attrs,
+            timeouts: null,
+            importInfo: { importable: false },
+        };
+    }
+
+    function makeDocAttr(overrides: Partial<DocAttribute> = {}): DocAttribute {
+        return {
+            name: "test_attr",
+            descriptionText: "The test attribute.",
+            startLine: 50,
+            ...overrides,
+        };
+    }
+
+    function makeAttrDocStructure(attrs: DocAttribute[]): DocStructure {
+        return {
+            frontmatter: null,
+            resourceName: null,
+            expectedDescription: null,
+            arguments: [],
+            attributes: attrs,
+        };
+    }
+
+    function buildCtx(view: SchemaSemanticView, doc: DocStructure): Context {
+        const ctx = new Context();
+        ctx.set(CTX_SCHEMA_SEMANTIC_VIEW, view);
+        ctx.set(CTX_DOC_STRUCTURE, doc);
+        return ctx;
+    }
+
+    function collectFailureMessages(results: RuleCheckResult[]): string[] {
+        const messages: string[] = [];
+        for (const r of results) {
+            if (!r.success) {
+                messages.push(r.message);
+                if (r.children) {
+                    for (const child of r.children) {
+                        if (!child.success) messages.push(child.message);
+                    }
+                }
+            }
+        }
+        return messages;
+    }
+
+    it("should pass when attribute description matches schema description", async () => {
+        const field = makeAttrField({
+            name: "weight",
+            description: "The weight value of the channel member.",
+        });
+        const view = makeAttrView(new Map([["weight", field]]));
+        const doc = makeAttrDocStructure([
+            makeDocAttr({
+                name: "weight",
+                descriptionText: "The weight value of the channel member.",
+            }),
+        ]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should fail when attribute description does not match schema", async () => {
+        const field = makeAttrField({
+            name: "weight",
+            description: "The weight value of the channel member.",
+        });
+        const view = makeAttrView(new Map([["weight", field]]));
+        const doc = makeAttrDocStructure([
+            makeDocAttr({
+                name: "weight",
+                descriptionText: "The member weight.",
+            }),
+        ]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("description should be"))).toBe(true);
+    });
+
+    it("should skip description check when schema has no description", async () => {
+        const field = makeAttrField({
+            name: "weight",
+            description: "",
+        });
+        const view = makeAttrView(new Map([["weight", field]]));
+        const doc = makeAttrDocStructure([
+            makeDocAttr({
+                name: "weight",
+                descriptionText: "Some arbitrary text.",
+            }),
+        ]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should still detect missing and extra attributes alongside description checks", async () => {
+        const field = makeAttrField({
+            name: "create_time",
+            description: "The creation time.",
+        });
+        const view = makeAttrView(new Map([["create_time", field]]));
+        const doc = makeAttrDocStructure([
+            makeDocAttr({
+                name: "unknown_attr",
+                descriptionText: "Something.",
+            }),
+        ]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("missing from the document"))).toBe(true);
+        expect(msgs.some((m) => m.includes("not found in the schema"))).toBe(true);
+    });
+});
+
+describe("SectionExistenceRule - intro line validation", () => {
+    const CTX_SCHEMA_SEMANTIC_VIEW = "resource-check.stage.schemaSemanticView";
+    const mdParser = new MarkdownParser();
+
+    function makeView(overrides: Partial<SchemaSemanticView> = {}): SchemaSemanticView {
+        return {
+            resourceName: "test_resource",
+            arguments: new Map([["name", {
+                name: "name",
+                type: "TypeString",
+                required: true,
+                optional: false,
+                computed: false,
+                forceNew: false,
+                nonUpdatable: false,
+                description: "The name.",
+            }]]),
+            attributes: new Map(),
+            timeouts: null,
+            importInfo: { importable: false },
+            ...overrides,
+        };
+    }
+
+    function buildCtx(view: SchemaSemanticView): Context {
+        const ctx = new Context();
+        ctx.set(CTX_SCHEMA_SEMANTIC_VIEW, view);
+        return ctx;
+    }
+
+    it("should pass when Argument Reference has correct intro line", async () => {
+        const md = [
+            "## Argument Reference",
+            "",
+            "The following arguments are supported:",
+            "",
+            "* `name` - (Required, String) Specifies the name.",
+        ].join("\n");
+
+        const ast = mdParser.parse(md);
+        const rule = new SectionExistenceRule();
+        const results = await rule.test(md, ast, buildCtx(makeView()));
+
+        const argResult = results.find((r) =>
+            r.message.includes("Argument Reference"),
+        );
+        expect(argResult).toBeDefined();
+        expect(argResult!.success).toBe(true);
+        expect(argResult!.message).toContain("correct intro line");
+    });
+
+    it("should fail when Argument Reference has wrong intro line", async () => {
+        const md = [
+            "## Argument Reference",
+            "",
+            "These are the arguments:",
+            "",
+            "* `name` - (Required, String) Specifies the name.",
+        ].join("\n");
+
+        const ast = mdParser.parse(md);
+        const rule = new SectionExistenceRule();
+        const results = await rule.test(md, ast, buildCtx(makeView()));
+
+        const argResult = results.find((r) =>
+            r.message.includes("Argument Reference") && !r.success,
+        );
+        expect(argResult).toBeDefined();
+        expect(argResult!.success).toBe(false);
+        expect(argResult!.message).toContain("intro line should be");
+        expect(argResult!.message).toContain("The following arguments are supported:");
+    });
+
+    it("should fail when Argument Reference has no paragraph before list", async () => {
+        const md = [
+            "## Argument Reference",
+            "",
+            "* `name` - (Required, String) Specifies the name.",
+        ].join("\n");
+
+        const ast = mdParser.parse(md);
+        const rule = new SectionExistenceRule();
+        const results = await rule.test(md, ast, buildCtx(makeView()));
+
+        const argResult = results.find((r) =>
+            r.message.includes("Argument Reference") && !r.success,
+        );
+        expect(argResult).toBeDefined();
+        expect(argResult!.success).toBe(false);
+        expect(argResult!.message).toContain("missing the required intro line");
+    });
+
+    it("should pass when Attribute Reference has correct intro line", async () => {
+        const view = makeView({
+            attributes: new Map([["id", {
+                name: "id",
+                type: "TypeString",
+                required: false,
+                optional: false,
+                computed: true,
+                forceNew: false,
+                nonUpdatable: false,
+                description: "The ID.",
+            }]]),
+        });
+
+        const md = [
+            "## Argument Reference",
+            "",
+            "The following arguments are supported:",
+            "",
+            "* `name` - (Required, String) Specifies the name.",
+            "",
+            "## Attribute Reference",
+            "",
+            "In addition to all arguments above, the following attributes are exported:",
+            "",
+            "* `id` - The ID.",
+        ].join("\n");
+
+        const ast = mdParser.parse(md);
+        const rule = new SectionExistenceRule();
+        const results = await rule.test(md, ast, buildCtx(view));
+
+        const attrResult = results.find((r) =>
+            r.message.includes("Attribute Reference"),
+        );
+        expect(attrResult).toBeDefined();
+        expect(attrResult!.success).toBe(true);
+        expect(attrResult!.message).toContain("correct intro line");
+    });
+
+    it("should fail when Attribute Reference has wrong intro line", async () => {
+        const view = makeView({
+            attributes: new Map([["id", {
+                name: "id",
+                type: "TypeString",
+                required: false,
+                optional: false,
+                computed: true,
+                forceNew: false,
+                nonUpdatable: false,
+                description: "The ID.",
+            }]]),
+        });
+
+        const md = [
+            "## Argument Reference",
+            "",
+            "The following arguments are supported:",
+            "",
+            "* `name` - (Required, String) Specifies the name.",
+            "",
+            "## Attribute Reference",
+            "",
+            "The following attributes are exported:",
+            "",
+            "* `id` - The ID.",
+        ].join("\n");
+
+        const ast = mdParser.parse(md);
+        const rule = new SectionExistenceRule();
+        const results = await rule.test(md, ast, buildCtx(view));
+
+        const attrResult = results.find((r) =>
+            r.message.includes("Attribute Reference") && !r.success,
+        );
+        expect(attrResult).toBeDefined();
+        expect(attrResult!.success).toBe(false);
+        expect(attrResult!.message).toContain("intro line should be");
+        expect(attrResult!.message).toContain(
+            "In addition to all arguments above, the following attributes are exported:",
+        );
+    });
+
+    it("should fail when Attribute Reference has no paragraph before list", async () => {
+        const view = makeView({
+            attributes: new Map([["id", {
+                name: "id",
+                type: "TypeString",
+                required: false,
+                optional: false,
+                computed: true,
+                forceNew: false,
+                nonUpdatable: false,
+                description: "The ID.",
+            }]]),
+        });
+
+        const md = [
+            "## Argument Reference",
+            "",
+            "The following arguments are supported:",
+            "",
+            "* `name` - (Required, String) Specifies the name.",
+            "",
+            "## Attribute Reference",
+            "",
+            "* `id` - The ID.",
+        ].join("\n");
+
+        const ast = mdParser.parse(md);
+        const rule = new SectionExistenceRule();
+        const results = await rule.test(md, ast, buildCtx(view));
+
+        const attrResult = results.find((r) =>
+            r.message.includes("Attribute Reference") && !r.success,
+        );
+        expect(attrResult).toBeDefined();
+        expect(attrResult!.success).toBe(false);
+        expect(attrResult!.message).toContain("missing the required intro line");
     });
 });

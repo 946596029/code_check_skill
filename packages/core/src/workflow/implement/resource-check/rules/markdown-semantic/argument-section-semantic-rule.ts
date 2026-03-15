@@ -20,6 +20,9 @@ const META: RuleMeta = {
             `Argument "${name}" (line ${line}): missing expected tag "${tag}".`,
         extraTag: (name: unknown, tag: unknown, line: unknown) =>
             `Argument "${name}" (line ${line}): unexpected tag "${tag}" (not in schema).`,
+        descriptionMismatch: (name: unknown, expected: unknown, actual: unknown, line: unknown) =>
+            `Argument "${name}" (line ${line}): description should start with "${expected}" ` +
+            `but found "${actual}".`,
         missingInDoc: (name: unknown) =>
             `Argument "${name}" is defined in schema but missing from the document.`,
         extraInDoc: (name: unknown, line: unknown) =>
@@ -30,7 +33,6 @@ const META: RuleMeta = {
 const TAG_SCHEMA_MAP: Record<string, (f: SemanticField) => boolean> = {
     ForceNew: (f) => f.forceNew,
     NonUpdatable: (f) => f.nonUpdatable,
-    Computed: (f) => f.computed && (f.required || f.optional),
 };
 
 export class ArgumentSectionSemanticRule extends Rule {
@@ -65,7 +67,8 @@ export class ArgumentSectionSemanticRule extends Rule {
         const failures: RuleCheckResult[] = [];
 
         this.checkOrdering(docArgs, failures);
-        this.checkTagAlignment(docArgs, view, failures); 
+        this.checkTagAlignment(docArgs, view, failures);
+        this.checkDescriptionAlignment(docArgs, view, failures);
         this.checkCompleteness(docArgs, view, failures);
 
         if (failures.length === 0) {
@@ -185,6 +188,38 @@ export class ArgumentSectionSemanticRule extends Rule {
         }
     }
 
+    private checkDescriptionAlignment(
+        docArgs: DocArgument[],
+        view: SchemaSemanticView,
+        failures: RuleCheckResult[],
+    ): void {
+        for (const arg of docArgs) {
+            const field = view.arguments.get(arg.name);
+            if (!field || !field.description) continue;
+
+            const expectedPrefix = lowercaseFirst(field.description);
+            const docDesc = arg.descriptionText;
+            if (!docDesc.startsWith(expectedPrefix)) {
+                const previewLen = expectedPrefix.length + 20;
+                const actualPreview = docDesc.length > previewLen
+                    ? docDesc.slice(0, previewLen) + "..."
+                    : docDesc;
+                failures.push(
+                    this.fail(
+                        "descriptionMismatch",
+                        "",
+                        undefined,
+                        RuleCheckResult.fromLine(arg.startLine),
+                        arg.name,
+                        "Specifies " + expectedPrefix,
+                        "Specifies " + actualPreview,
+                        arg.startLine,
+                    ),
+                );
+            }
+        }
+    }
+
     private checkCompleteness(
         docArgs: DocArgument[],
         view: SchemaSemanticView,
@@ -215,4 +250,9 @@ export class ArgumentSectionSemanticRule extends Rule {
             }
         }
     }
+}
+
+function lowercaseFirst(s: string): string {
+    if (s.length === 0) return s;
+    return s[0].toLowerCase() + s.slice(1);
 }

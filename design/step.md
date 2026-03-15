@@ -61,6 +61,8 @@ Core 输入侧不完整：当前 Go 提取模型主要聚焦 fields，对 timeou
 规则职责边界不清：结构规则、语义规则、跨源一致性规则可能混在一起，后续维护和排障成本会升高。
 缺失强制门禁：当前对 section 不存在的场景普遍是“跳过”，缺少“应存在但缺失”的硬性错误机制。
 
+npx tsx packages/core-test/scripts/core-test/run-core-check.ts --input="{\"resourceName\":\"apig_channel_members\",\"resourceType\":\"data-source\"}"
+
 # 6. 实现对 implement 文件 go 函数命名的检查，代码模式检查
 
 需要使用到意图识别

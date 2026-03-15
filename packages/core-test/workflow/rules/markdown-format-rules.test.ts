@@ -3,6 +3,7 @@ import {
     FrontmatterCheckRule,
     LineLengthRule,
     NumberFormatRule,
+    BlankLineBetweenBlocksRule,
     H1ExistsRule,
     ExampleSectionExistsRule,
     MarkdownParser,
@@ -12,7 +13,10 @@ const parser = new MarkdownParser();
 
 // ─── Helpers ────────────────────────────────────────────────
 
-function check(rule: InstanceType<typeof FrontmatterCheckRule>, md: string) {
+function check(
+    rule: { test: (code: string, ast?: unknown) => Promise<Array<{ [k: string]: any }>> },
+    md: string
+) {
     const ast = parser.parse(md);
     return rule.test(md, ast);
 }
@@ -215,6 +219,67 @@ describe("LineLengthRule", () => {
         expect(results).toHaveLength(1);
         expect(results[0].success).toBe(false);
         expect(results[0].children).toHaveLength(2);
+    });
+});
+
+// ─── BlankLineBetweenBlocksRule ──────────────────────────────
+
+describe("BlankLineBetweenBlocksRule", () => {
+    const rule = new BlankLineBetweenBlocksRule();
+
+    it("should fail when top-level blocks are adjacent without a blank line", async () => {
+        const md = [
+            "# Resource",
+            "Description line without blank separator.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(false);
+        expect(results[0].children.length).toBeGreaterThan(0);
+    });
+
+    it("should pass when top-level blocks are separated by a blank line", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "Description line with blank separator.",
+            "",
+            "## Argument Reference",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should not treat list item continuation lines as missing separators", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "* `members` - First line.  ",
+            "  Continuation line.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should not fail for nested list inside a list item", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "* `precise_search` - Intro text.",
+            "  The valid values are as follows:",
+            "  + **name**",
+            "  + **member_group_name**",
+            "  Additional text after nested list.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(true);
     });
 });
 

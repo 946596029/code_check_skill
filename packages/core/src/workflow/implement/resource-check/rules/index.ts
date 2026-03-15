@@ -6,6 +6,7 @@ export {
     FrontmatterCheckRule,
     LineLengthRule,
     NumberFormatRule,
+    BlankLineBetweenBlocksRule,
     H1ExistsRule,
     ExampleSectionExistsRule,
 } from "./markdown-format";
