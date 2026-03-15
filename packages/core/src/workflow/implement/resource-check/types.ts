@@ -1,6 +1,90 @@
 import path from "path";
+import type { SchemaFieldType } from "../../../tools/ast-parser/go/types";
 
 export type ResourceType = "resource" | "data-source";
+
+/**
+ * A single argument extracted from the "Argument Reference" Markdown section.
+ * Mirrors Go-side SchemaField for cross-source comparison.
+ */
+export interface DocArgument {
+    name: string;
+    modifier: string;
+    type: string;
+    tags: string[];
+    descriptionText: string;
+    startLine: number;
+}
+
+/**
+ * A single attribute extracted from the "Attributes Reference" Markdown section.
+ */
+export interface DocAttribute {
+    name: string;
+    descriptionText: string;
+    startLine: number;
+}
+
+/**
+ * Structured representation of a Terraform resource Markdown document,
+ * extracted during the extract-doc-structure stage.
+ */
+export interface DocStructure {
+    frontmatter: Record<string, unknown> | null;
+    resourceName: string | null;
+    expectedDescription: string | null;
+    arguments: DocArgument[];
+    attributes: DocAttribute[];
+}
+
+/**
+ * A schema field enriched with document-oriented semantic tags.
+ * Used by doc-semantic rules to compare against DocArgument/DocAttribute.
+ */
+export interface SemanticField {
+    name: string;
+    type: SchemaFieldType | string;
+    required: boolean;
+    optional: boolean;
+    computed: boolean;
+    forceNew: boolean;
+    nonUpdatable: boolean;
+    description: string;
+    subFields?: SemanticField[];
+}
+
+/**
+ * Simplified timeout view with millisecond values.
+ * Only includes entries where the normalizer had high confidence.
+ */
+export interface TimeoutView {
+    create?: number;
+    read?: number;
+    update?: number;
+    delete?: number;
+}
+
+/**
+ * Import capability and ID format for a resource.
+ */
+export interface ImportView {
+    importable: boolean;
+    stateFunc?: string;
+    idParts?: string[];
+}
+
+/**
+ * Schema-derived semantic view consumed by document validation rules.
+ * Built from raw ResourceSchema + ResourceSemantics during the
+ * check-markdown-semantic stage.
+ */
+export interface SchemaSemanticView {
+    resourceName: string;
+    arguments: Map<string, SemanticField>;
+    attributes: Map<string, SemanticField>;
+    timeouts: TimeoutView | null;
+    importInfo: ImportView;
+}
 
 export interface ResourceCheckInput {
     providerRoot: string;

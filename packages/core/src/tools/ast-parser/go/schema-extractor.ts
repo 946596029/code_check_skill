@@ -60,6 +60,8 @@ function unwrap(node: SyntaxNode): SyntaxNode {
  * ```
  */
 export class TerraformSchemaExtractor {
+    private currentRoot: SyntaxNode | null = null;
+
     constructor(private parser: GoParser) {}
 
     /**
@@ -68,17 +70,22 @@ export class TerraformSchemaExtractor {
     public extract(goSource: string): ResourceSchema[] {
         const tree = this.parser.parse(goSource);
         const root = tree.rootNode;
+        this.currentRoot = root;
         const results: ResourceSchema[] = [];
 
-        const funcDecls = this.parser.findByType(root, "function_declaration");
-        for (const fn of funcDecls) {
-            const schema = this.extractFromFunction(fn);
-            if (schema) {
-                results.push(schema);
+        try {
+            const funcDecls = this.parser.findByType(root, "function_declaration");
+            for (const fn of funcDecls) {
+                const schema = this.extractFromFunction(fn);
+                if (schema) {
+                    results.push(schema);
+                }
             }
+        } finally {
+            this.currentRoot = null;
+            tree.delete();
         }
 
-        tree.delete();
         return results;
     }
 
@@ -280,9 +287,10 @@ export class TerraformSchemaExtractor {
     }
 
     /**
-     * Parse the `Elem` property which can be either:
+     * Parse the `Elem` property which can be:
      * - `&schema.Schema{ Type: schema.TypeString }` (simple element type)
      * - `&schema.Resource{ Schema: map[string]*schema.Schema{ ... } }` (nested block)
+     * - `someSchemaFunc()` (function call returning *schema.Resource)
      */
     private parseElem(field: SchemaField, elemNode: SyntaxNode): void {
         let inner = elemNode;
@@ -290,6 +298,14 @@ export class TerraformSchemaExtractor {
             const operand = inner.childForFieldName("operand");
             if (!operand) return;
             inner = operand;
+        }
+
+        if (inner.type === "call_expression") {
+            const resolved = this.resolveSchemaFuncCall(inner);
+            if (resolved) {
+                field.subFields = resolved;
+            }
+            return;
         }
 
         if (inner.type !== "composite_literal") return;
@@ -318,6 +334,38 @@ export class TerraformSchemaExtractor {
                 field.subFields = this.extractFieldsFromMap(schemaMap);
             }
         }
+    }
+
+    /**
+     * Resolve an `Elem: someFunc()` call expression by locating the
+     * function definition in the same file and extracting its returned
+     * schema fields.
+     */
+    private resolveSchemaFuncCall(callNode: SyntaxNode): SchemaField[] | undefined {
+        if (!this.currentRoot) return undefined;
+
+        const funcNode = callNode.childForFieldName("function");
+        if (!funcNode) return undefined;
+        const funcName = funcNode.text;
+
+        const funcDecls = this.parser.findByType(this.currentRoot, "function_declaration");
+
+        for (const fn of funcDecls) {
+            const nameNode = fn.childForFieldName("name");
+            if (!nameNode || nameNode.text !== funcName) continue;
+
+            const body = fn.childForFieldName("body");
+            if (!body) continue;
+
+            const resourceLiteral = this.findResourceLiteral(body);
+            if (!resourceLiteral) continue;
+
+            const schemaMap = this.findSchemaMap(resourceLiteral);
+            if (schemaMap) {
+                return this.extractFieldsFromMap(schemaMap);
+            }
+        }
+        return undefined;
     }
 
     private extractResourceOptions(resourceLiteral: SyntaxNode): ResourceOptions {

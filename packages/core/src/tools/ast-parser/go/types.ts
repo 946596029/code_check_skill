@@ -134,10 +134,26 @@ export interface ForceNewSemantics {
     source: "customizeDiff";
 }
 
+/** Semantic projection for non-updatable behavior inferred from CustomizeDiff. */
+export interface NonUpdatableSemantics {
+    fields: string[];
+    confidence: SemanticConfidence;
+    source: "customizeDiff";
+}
+
 /** Semantic projection for import capability. */
 export interface ImportableSemantics {
     value: boolean;
     confidence: "high";
+}
+
+/** Semantic projection for import ID format. */
+export interface ImportIdSemantics {
+    /** Ordered parts of the import ID (e.g. ["region", "id"]). */
+    parts: string[];
+    /** Separator used to join parts (typically "/"). */
+    separator: string;
+    confidence: SemanticConfidence;
 }
 
 /** Consolidated semantic view for a resource schema. */
@@ -145,4 +161,6 @@ export interface ResourceSemantics {
     importable?: ImportableSemantics;
     timeouts?: ResourceTimeoutSemantics;
     forceNew?: ForceNewSemantics;
+    nonUpdatable?: NonUpdatableSemantics;
+    importIdParts?: ImportIdSemantics;
 }

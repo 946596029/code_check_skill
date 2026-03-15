@@ -30,8 +30,29 @@ export {
     ExampleUsageStructureRule,
     RESOURCE_DOC_RULES,
 } from "./workflow/implement/resource-doc/rules";
-export { ResourceCheckWorkflow } from "./workflow/implement/resource-check/resource-check-workflow";
-export type { ResourceCheckInput, ResourceType } from "./workflow/implement/resource-check/types";
+export {
+    ResourceCheckWorkflow,
+    buildSchemaSemanticView,
+} from "./workflow/implement/resource-check/resource-check-workflow";
+export {
+    MARKDOWN_FORMAT_RULES,
+    FrontmatterCheckRule,
+    LineLengthRule,
+    NumberFormatRule,
+    H1ExistsRule,
+    ExampleSectionExistsRule,
+} from "./workflow/implement/resource-check/rules";
+export type {
+    ResourceCheckInput,
+    ResourceType,
+    DocStructure,
+    DocArgument,
+    DocAttribute,
+    SchemaSemanticView,
+    SemanticField,
+    TimeoutView,
+    ImportView,
+} from "./workflow/implement/resource-check/types";
 export { parseResourceCheckInput, resolveResourcePaths } from "./workflow/implement/resource-check/types";
 
 // ── Description Format Spec ──

@@ -121,6 +121,45 @@ func resourceWithOptions() *schema.Resource {
 }
 `;
 
+const FUNC_CALL_ELEM_SOURCE = `
+package huaweicloud
+
+import "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+
+func resourceWithFuncCallElem() *schema.Resource {
+    return &schema.Resource{
+        Schema: map[string]*schema.Schema{
+            "name": {
+                Type:     schema.TypeString,
+                Required: true,
+            },
+            "labels": {
+                Type:     schema.TypeList,
+                Optional: true,
+                Elem:     labelsSchema(),
+            },
+        },
+    }
+}
+
+func labelsSchema() *schema.Resource {
+    return &schema.Resource{
+        Schema: map[string]*schema.Schema{
+            "key": {
+                Type:        schema.TypeString,
+                Required:    true,
+                Description: "The label key.",
+            },
+            "value": {
+                Type:        schema.TypeString,
+                Required:    true,
+                Description: "The label value.",
+            },
+        },
+    }
+}
+`;
+
 const HUAWEICLOUD_CHANNEL_MEMBER_GROUP_SOURCE = readFileSync(
     new URL(
         "../../terraform_provider_example/resource_huaweicloud_apig_channel_member_group.go",
@@ -231,6 +270,72 @@ describe("TerraformSchemaExtractor", () => {
             const weight = member.subFields!.find((f) => f.name === "weight")!;
             expect(weight.type).toBe("TypeInt");
             expect(weight.defaultValue).toBe("1");
+        });
+    });
+
+    describe("Elem function call resolution", () => {
+        it("should resolve Elem: funcCall() to subFields", () => {
+            const schemas = extractor.extract(FUNC_CALL_ELEM_SOURCE);
+            const resource = schemas.find((s) => s.functionName === "resourceWithFuncCallElem")!;
+            expect(resource).toBeDefined();
+
+            const labels = resource.fields.find((f) => f.name === "labels")!;
+            expect(labels.type).toBe("TypeList");
+            expect(labels.subFields).toBeDefined();
+            expect(labels.subFields).toHaveLength(2);
+
+            const key = labels.subFields!.find((f) => f.name === "key")!;
+            expect(key.type).toBe("TypeString");
+            expect(key.required).toBe(true);
+            expect(key.description).toBe("The label key.");
+
+            const value = labels.subFields!.find((f) => f.name === "value")!;
+            expect(value.type).toBe("TypeString");
+            expect(value.required).toBe(true);
+            expect(value.description).toBe("The label value.");
+        });
+
+        it("should resolve microservice_labels subFields from real provider file", () => {
+            const schemas = extractor.extract(HUAWEICLOUD_CHANNEL_MEMBER_GROUP_SOURCE);
+            const resource = schemas.find((s) => s.functionName === "ResourceChannelMemberGroup")!;
+            expect(resource).toBeDefined();
+
+            const labels = resource.fields.find((f) => f.name === "microservice_labels")!;
+            expect(labels).toBeDefined();
+            expect(labels.type).toBe("TypeList");
+            expect(labels.subFields).toBeDefined();
+            expect(labels.subFields).toHaveLength(2);
+
+            const nameField = labels.subFields!.find((f) => f.name === "name")!;
+            expect(nameField.type).toBe("TypeString");
+            expect(nameField.required).toBe(true);
+
+            const valueField = labels.subFields!.find((f) => f.name === "value")!;
+            expect(valueField.type).toBe("TypeString");
+            expect(valueField.required).toBe(true);
+        });
+
+        it("should not produce subFields when target function is absent", () => {
+            const source = `
+package test
+
+import "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+
+func resourceMissing() *schema.Resource {
+    return &schema.Resource{
+        Schema: map[string]*schema.Schema{
+            "items": {
+                Type: schema.TypeList,
+                Elem: nonExistentSchema(),
+            },
+        },
+    }
+}
+`;
+            const schemas = extractor.extract(source);
+            expect(schemas).toHaveLength(1);
+            const items = schemas[0].fields.find((f) => f.name === "items")!;
+            expect(items.subFields).toBeUndefined();
         });
     });
 

@@ -1,12 +1,23 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
 import path from "path";
 import {
     CodeChecker,
     ResourceCheckWorkflow,
     parseResourceCheckInput,
     resolveResourcePaths,
+    buildSchemaSemanticView,
+    GoParser,
+    TerraformSchemaExtractor,
+    TerraformSchemaSemanticNormalizer,
 } from "@code-check/core";
-import type { ResourceCheckInput, CheckReport } from "@code-check/core";
+import type {
+    ResourceCheckInput,
+    CheckReport,
+    DocStructure,
+    SchemaSemanticView,
+    ResourceSchema,
+} from "@code-check/core";
 
 const EXAMPLE_ROOT = path.resolve(
     __dirname,
@@ -96,11 +107,13 @@ describe("resolveResourcePaths", () => {
 
 describe("ResourceCheckWorkflow", () => {
     let checker: CodeChecker;
+    let workflow: ResourceCheckWorkflow;
 
     beforeEach(async () => {
         checker = new CodeChecker();
         await checker.initialize();
-        checker.registerWorkflow(new ResourceCheckWorkflow());
+        workflow = new ResourceCheckWorkflow();
+        checker.registerWorkflow(workflow);
     });
 
     it("should appear in workflow list", () => {
@@ -116,7 +129,7 @@ describe("ResourceCheckWorkflow", () => {
         expect(wf!.description).toContain("Staged checks");
     });
 
-    it("should run all 8 stages and produce results for real resource files", async () => {
+    it("should run all 9 stages and produce results for real resource files", async () => {
         const input = makeInput();
         const report = await checker.check({
             code: toCode(input),
@@ -127,7 +140,11 @@ describe("ResourceCheckWorkflow", () => {
 
         const names = report.results.map((r) => r.ruleName);
         expect(names).toContain("implement-structured-check");
-        expect(names).toContain("doc-format-check");
+        expect(names).toContain("md-frontmatter-check");
+        expect(names).toContain("md-line-length");
+        expect(names).toContain("md-number-format");
+        expect(names).toContain("md-h1-exists");
+        expect(names).toContain("md-example-section-exists");
         expect(names).toContain("doc-semantic-check");
         expect(names).toContain("test-go-structured-check");
         expect(names).toContain("test-hcl-style-check");
@@ -192,5 +209,209 @@ describe("ResourceCheckWorkflow", () => {
         expect(implementCheck).toBeDefined();
         expect(implementCheck!.results[0].success).toBe(false);
         expect(implementCheck!.results[0].message).toContain("missing or empty");
+    });
+
+    describe("extract-doc-structure stage", () => {
+        async function runAndGetReport(
+            overrides: Partial<ResourceCheckInput> = {},
+        ): Promise<CheckReport> {
+            const input = makeInput(overrides);
+            return checker.check({
+                code: toCode(input),
+                workflowId: "resource-check",
+            });
+        }
+
+        it("should extract frontmatter from real markdown", async () => {
+            const report = await runAndGetReport();
+            const formatResult = report.results.find(
+                (r) => r.ruleName === "md-frontmatter-check",
+            );
+            expect(formatResult).toBeDefined();
+            expect(formatResult!.results[0].success).toBe(true);
+        });
+
+        it("should not produce stage error for extract-doc-structure", async () => {
+            const report = await runAndGetReport();
+            const stageError = report.results.find(
+                (r) => r.ruleName === "stage:extract-doc-structure",
+            );
+            expect(stageError).toBeUndefined();
+        });
+
+        it("should produce empty doc structure when markdown is missing", async () => {
+            const report = await runAndGetReport({
+                resourceName: "nonexistent_resource",
+            });
+            const formatResult = report.results.find(
+                (r) => r.ruleName === "doc-format-check",
+            );
+            expect(formatResult).toBeDefined();
+            expect(formatResult!.results[0].success).toBe(false);
+            expect(formatResult!.results[0].message).toContain("missing or empty");
+        });
+    });
+
+    describe("check-markdown-semantic stage", () => {
+        it("should skip semantic view when go schema is missing", async () => {
+            const input = makeInput({ resourceName: "nonexistent_resource" });
+            const report = await checker.check({
+                code: toCode(input),
+                workflowId: "resource-check",
+            });
+
+            const semanticResult = report.results.find(
+                (r) => r.ruleName === "doc-semantic-check",
+            );
+            expect(semanticResult).toBeDefined();
+            expect(semanticResult!.results[0].success).toBe(false);
+            expect(semanticResult!.results[0].message).toContain("skipped");
+        });
+    });
+});
+
+describe("buildSchemaSemanticView", () => {
+    const CHANNEL_MEMBER_GROUP_SOURCE = readFileSync(
+        new URL(
+            "../terraform_provider_example/resource_huaweicloud_apig_channel_member_group.go",
+            import.meta.url,
+        ),
+        "utf8",
+    );
+
+    let parser: GoParser;
+    let normalizedSchema: ResourceSchema;
+
+    beforeAll(async () => {
+        parser = await GoParser.create();
+        const extractor = new TerraformSchemaExtractor(parser);
+        const normalizer = new TerraformSchemaSemanticNormalizer();
+        const schemas = extractor.extract(CHANNEL_MEMBER_GROUP_SOURCE);
+        const target = schemas.find((s) => s.functionName === "ResourceChannelMemberGroup")!;
+        [normalizedSchema] = normalizer.normalizeSchemas(
+            CHANNEL_MEMBER_GROUP_SOURCE,
+            [target],
+        );
+    });
+
+    afterAll(() => {
+        parser.dispose();
+    });
+
+    it("should classify required and optional fields as arguments", () => {
+        const view = buildSchemaSemanticView(normalizedSchema);
+
+        expect(view.arguments.has("instance_id")).toBe(true);
+        expect(view.arguments.has("vpc_channel_id")).toBe(true);
+        expect(view.arguments.has("name")).toBe(true);
+        expect(view.arguments.has("description")).toBe(true);
+        expect(view.arguments.has("weight")).toBe(true);
+        expect(view.arguments.has("region")).toBe(true);
+
+        const instanceId = view.arguments.get("instance_id")!;
+        expect(instanceId.required).toBe(true);
+        expect(instanceId.optional).toBe(false);
+
+        const description = view.arguments.get("description")!;
+        expect(description.required).toBe(false);
+        expect(description.optional).toBe(true);
+    });
+
+    it("should classify computed-only fields as attributes", () => {
+        const view = buildSchemaSemanticView(normalizedSchema);
+
+        expect(view.attributes.has("create_time")).toBe(true);
+        expect(view.attributes.has("update_time")).toBe(true);
+
+        const createTime = view.attributes.get("create_time")!;
+        expect(createTime.computed).toBe(true);
+        expect(createTime.required).toBe(false);
+        expect(createTime.optional).toBe(false);
+    });
+
+    it("should merge forceNew from schema-level and customizeDiff sources", () => {
+        const view = buildSchemaSemanticView(normalizedSchema);
+
+        const region = view.arguments.get("region")!;
+        expect(region.forceNew).toBe(true);
+
+        const instanceId = view.arguments.get("instance_id")!;
+        expect(instanceId.forceNew).toBe(true);
+
+        const vpcChannelId = view.arguments.get("vpc_channel_id")!;
+        expect(vpcChannelId.forceNew).toBe(true);
+    });
+
+    it("should populate importInfo from provider resource", () => {
+        const view = buildSchemaSemanticView(normalizedSchema);
+
+        expect(view.importInfo.importable).toBe(true);
+        expect(view.importInfo.stateFunc).toBe("resourceChannelMemberGroupImportState");
+        expect(view.importInfo.idParts).toBeDefined();
+        expect(view.importInfo.idParts!).toEqual(["instance_id", "vpc_channel_id", "id"]);
+    });
+
+    it("should include subFields for nested block arguments", () => {
+        const view = buildSchemaSemanticView(normalizedSchema);
+
+        const labels = view.arguments.get("microservice_labels");
+        expect(labels).toBeDefined();
+        expect(labels!.subFields).toBeDefined();
+        expect(labels!.subFields!.length).toBe(2);
+
+        const nameField = labels!.subFields!.find((f) => f.name === "name")!;
+        expect(nameField.type).toBe("TypeString");
+        expect(nameField.required).toBe(true);
+
+        const valueField = labels!.subFields!.find((f) => f.name === "value")!;
+        expect(valueField.type).toBe("TypeString");
+        expect(valueField.required).toBe(true);
+    });
+
+    it("should set timeouts to null when no timeout semantics present", () => {
+        const view = buildSchemaSemanticView(normalizedSchema);
+        expect(view.timeouts).toBeNull();
+    });
+
+    it("should set resourceName from schema", () => {
+        const view = buildSchemaSemanticView(normalizedSchema);
+        expect(view.resourceName).toBe("channel_member_group");
+    });
+
+    it("should handle schema without resourceSemantics", () => {
+        const bareSchema: ResourceSchema = {
+            resourceName: "test_resource",
+            functionName: "resourceTest",
+            fields: [
+                {
+                    name: "name",
+                    type: "TypeString",
+                    required: true,
+                    optional: false,
+                    computed: false,
+                    forceNew: false,
+                    description: "The name.",
+                },
+                {
+                    name: "id_field",
+                    type: "TypeString",
+                    required: false,
+                    optional: false,
+                    computed: true,
+                    forceNew: false,
+                    description: "The ID.",
+                },
+            ],
+        };
+
+        const view = buildSchemaSemanticView(bareSchema);
+
+        expect(view.resourceName).toBe("test_resource");
+        expect(view.arguments.size).toBe(1);
+        expect(view.arguments.has("name")).toBe(true);
+        expect(view.attributes.size).toBe(1);
+        expect(view.attributes.has("id_field")).toBe(true);
+        expect(view.timeouts).toBeNull();
+        expect(view.importInfo.importable).toBe(false);
     });
 });

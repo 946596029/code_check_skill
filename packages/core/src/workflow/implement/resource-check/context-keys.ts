@@ -29,6 +29,18 @@ export const CTX_IMPLEMENT_GO_SCHEMAS = "resource-check.stage.implementGoSchemas
 /** Parsed markdown AST */
 export const CTX_DOC_MARKDOWN_AST = "resource-check.stage.docMarkdownAst";
 
+/** Parsed frontmatter object from markdown doc */
+export const CTX_DOC_FRONTMATTER = "resource-check.stage.docFrontmatter";
+
+/** Resource name extracted from frontmatter page_title */
+export const CTX_DOC_RESOURCE_NAME = "resource-check.stage.docResourceName";
+
+/** Extracted DocStructure from markdown doc */
+export const CTX_DOC_STRUCTURE = "resource-check.stage.docStructure";
+
+/** Schema semantic view for doc validation (SchemaSemanticView) */
+export const CTX_SCHEMA_SEMANTIC_VIEW = "resource-check.stage.schemaSemanticView";
+
 /** Go test extraction summary */
 export const CTX_TEST_GO_SUMMARY = "resource-check.stage.testGoSummary";
 
