@@ -2,9 +2,11 @@
 
 import path from "path";
 import { CodeChecker } from "@code-check/core";
+import type { ResourceCheckInput } from "@code-check/core";
 import { setupChecker } from "./setup";
 import { listWorkflowCommand } from "./commands/list-workflow";
 import { checkCommand } from "./commands/check";
+import { resourceCheckCommand } from "./commands/resource-check";
 import { DefaultResourceResolver } from "./resolver/resource-resolver";
 
 const USAGE = `
@@ -12,8 +14,10 @@ Usage:
   code-check <file.md>                  Check a Markdown file (auto-detect workflow)
   code-check <workflow_name> <file_path>  Run a specific workflow on a file
                                          Example: code-check resource-doc ./docs/resource.md
+  code-check resource-check <providerRoot> <serviceName> <resourceName> <resourceType>
+                                         Run resource-check workflow
+                                         resourceType: resource | data-source
   code-check list workflow              List available workflows
-                                         Use this command to discover valid workflow_name values
 `;
 
 const WORKFLOW_BY_EXT: Record<string, string> = {
@@ -45,6 +49,29 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args[0] === "resource-check") {
+    if (args.length !== 5) {
+      console.error(
+        "resource-check requires exactly 4 arguments:\n" +
+        "  code-check resource-check <providerRoot> <serviceName> <resourceName> <resourceType>"
+      );
+      process.exit(1);
+    }
+    const [, providerRoot, serviceName, resourceName, resourceType] = args;
+    if (resourceType !== "resource" && resourceType !== "data-source") {
+      console.error(`resourceType must be "resource" or "data-source", got: "${resourceType}"`);
+      process.exit(1);
+    }
+    const input: ResourceCheckInput = {
+      providerRoot,
+      serviceName,
+      resourceName,
+      resourceType,
+    };
+    await resourceCheckCommand(checker, input);
+    return;
+  }
+
   if (args.length === 2) {
     const [workflowId, resourcePath] = args;
     await checkCommand(checker, resolver, workflowId, resourcePath);
@@ -66,14 +93,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (args.length > 2) {
-    console.error(`Invalid arguments: ${args.join(" ")}`);
-    console.error("Expected exactly: code-check <workflow_name> <file_path>");
-    console.log(USAGE);
-    process.exit(1);
-  }
-
-  console.error(`Unknown command: ${args.join(" ")}`);
+  console.error(`Unknown command or invalid arguments: ${args.join(" ")}`);
   console.log(USAGE);
   process.exit(1);
 }

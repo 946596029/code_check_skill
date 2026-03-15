@@ -43,14 +43,108 @@
 
 因为多流依赖很复杂，且现在的场景也可以简化实现，所以我们手工设计一个整合流
 
-## 流阶段
-1. go 结构化识别提取
-2. go 结构化检查 => 产生 implement 文件代码问题报告
-3. markdown 无语义格式检查 => 产生 doc 文件代码问题报告
-4. markdown 带语义格式检查 => 产生 doc 文件代码问题报告
-5. go test 结构化识别提取
-6. go test 结构化检查 => 产生 test case go 代码问题
-7. go test hcl 代码规范检查 => 直接使用已有脚本
+## Flow stages
+
+1. Resolve resource file locations and read content
+2. Go structured schema extraction
+3. Go structured check => produce implement file issue report
+4. Markdown format check (no semantic) => produce doc file issue report
+5. Markdown semantic check => produce doc file issue report
+6. Go test structured extraction
+7. Go test structured check => produce test case issue report
+8. Go test HCL style check => delegate to existing script
+
+## Input
+
+User provides: `providerRoot`, `serviceName`, `resourceName`, `resourceType` (resource | data-source).
+
+## File resolution rules
+
+Given `providerRoot`, `serviceName`, `resourceName`, `resourceType`:
+
+- provider prefix: `huaweicloud` (hardcoded for now)
+- full resource name: `{provider}_{resourceName}` (e.g. `huaweicloud_apig_channel_member`)
+- file prefix by type:
+  - resource => `resource_{fullResourceName}`
+  - data-source => `data_source_{fullResourceName}`
+
+Resolved file paths:
+
+- implement go:
+  `{providerRoot}/{provider}/services/{serviceName}/{filePrefix}.go`
+- doc markdown:
+  - resource => `{providerRoot}/docs/resources/{resourceName}.md`
+  - data-source => `{providerRoot}/docs/data-sources/{resourceName}.md`
+- test go:
+  `{providerRoot}/{provider}/services/acceptance/{serviceName}/{filePrefix}_test.go`
+
+Example (resource):
+
+| param        | value                          |
+|--------------|--------------------------------|
+| providerRoot | /path/to/terraform-provider    |
+| serviceName  | apig                           |
+| resourceName | apig_channel_member            |
+| resourceType | resource                       |
+
+Resolved:
+
+- implement: `{root}/huaweicloud/services/apig/resource_huaweicloud_apig_channel_member.go`
+- doc: `{root}/docs/resources/apig_channel_member.md`
+- test: `{root}/huaweicloud/services/acceptance/apig/resource_huaweicloud_apig_channel_member_test.go`
+
+## Implementation plan
+
+### New files
+
+- `packages/core/src/workflow/implement/resource-check/context-keys.ts`
+  Context key constants for stage artifacts (entry params, resolved paths,
+  loaded sources, extracted schemas, parsed ASTs, test summary, HCL status).
+- `packages/core/src/workflow/implement/resource-check/resource-check-workflow.ts`
+  `ResourceCheckWorkflow extends Workflow` with 8 stages defined in `defineStages()`.
+- `packages/core/src/workflow/implement/resource-check/rules/stage-placeholder-rule.ts`
+  Generic placeholder rule for stages not yet implemented; outputs readable
+  pass/fail message with source range.
+- `packages/core/src/workflow/implement/resource-check/rules/index.ts`
+  Re-exports `StagePlaceholderRule` and a default `RESOURCE_CHECK_RULES` array.
+
+### Modified files
+
+- `packages/core/src/index.ts`
+  Add export for `ResourceCheckWorkflow`.
+- `packages/cli/src/setup.ts`
+  Register `ResourceCheckWorkflow` in `setupChecker()`.
+- `packages/cli/src/index.ts`
+  Accept `resource-check <providerRoot> <serviceName> <resourceName> <resourceType>`
+  CLI arguments (4 args => build JSON input and call workflow).
+
+### Stage details
+
+1. **resolve-resource-files** - Build paths from input params, read each file.
+   Store resolved paths and source content into context via `CTX_*` keys.
+   If a file does not exist, store empty string (do not throw).
+2. **extract-go-schema** - If implement source is non-empty, call
+   `GoParser.create()` + `TerraformSchemaExtractor.extract()` and store
+   `ResourceSchema[]` into context. Otherwise store empty array.
+3. **check-go-implement** - Run placeholder rule reporting schema count or
+   missing file. Later stages will add real structural checks here.
+4. **check-markdown-format** - Parse markdown AST if doc source exists.
+   Run placeholder rule. Later stages will reuse `resource-doc` rules here.
+5. **check-markdown-semantic** - Read go schema artifacts from context.
+   Run placeholder rule that reports cross-source readiness.
+6. **extract-go-test** - Parse `_test.go` with `GoParser`, count functions
+   and test functions, store summary into context.
+7. **check-go-test** - Run placeholder rule reporting test function counts.
+8. **check-go-test-hcl-style** - Output `success: false` with message
+   "HCL style check script is not configured yet" as a placeholder.
+
+### Tests
+
+- Add `resource-check` to `code-checker.test.ts` registration tests.
+- New `packages/core-test/workflow/resource-check-workflow.test.ts`:
+  - Workflow runs against `terraform_provider_example` sample files.
+  - Returns 5 rule results (one per check stage: stages 3-8, minus extract-only).
+  - Stage 8 returns `success: false` with script-not-configured message.
 
 # 3. 扩展 go schema 解析能力
 
