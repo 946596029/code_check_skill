@@ -5,7 +5,7 @@
 ### core 层数据结果
 ```json
 {
-  "workflowId": "resource-doc",
+  "workflowId": "demo-workflow",
   "results": [
     {
       "ruleName": "argument-reference-structure",

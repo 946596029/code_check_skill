@@ -1,7 +1,7 @@
 # TODO
 ## 当前最高优先级（P0）
-- [x] 通过命令行完成 resource-doc workflow 的资源检查。
-    - 命令：`code-check resource-doc <file_path>`
+- [x] 通过命令行完成 workflow 的资源检查。
+    - 命令：`code-check <workflow_name> <file_path>`
 - [x] 规范检查结果类型，明确各属性的必填与选填要求。
 - [x] 调整各个规则的检查结果输出，确保符合统一结果标准。
     - [x] 通过的规则需要展示一下被匹配的代码位置
@@ -17,7 +17,7 @@
 
 
 ## 使用问题
-- [] resource-doc workflow 需要实现的检查规则
+- [] workflow 需要实现的检查规则
     - [] 语法检查
         - [x] 元信息检查，并解析元信息
         - [x] 一级目录检查
@@ -77,7 +77,7 @@
 - [x] 先打通一个 workflow, 针对 Markdown 文件走通一次检查流程  **重点**
 - [x] 修改入口目标，使其能够进行测试
     - 1. 打开到 package 目录下
-    - 2. pnpm cli -- resource-doc ${file_path}
+    - 2. pnpm cli -- <workflow_name> ${file_path}
 - [x] 收集规则样例，实现 `意图文本规范化` 功能
 - [] 重构 `意图文本规范化` 代码，这部分代码的结构不行
 - [] 编写资源的解析逻辑
@@ -90,7 +90,7 @@
 - 使用某个工作流检查资源
     - `code-check ${workflow_name} ${file_path}`
     - `pnpm cli -- ${workflow_name} ${file_path}`
-    - 示例 `code-check resource-doc ../../xxx.md`
+    - 示例 `code-check <workflow_name> ../../xxx.md`
 - `workflow_name` 请使用 `code-check list workflow` 返回的 id
 - 获取某个 markdown 文档的 ast 结构 `npx tsx .../scripts/parse-markdown.ts`
 

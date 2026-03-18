@@ -23,13 +23,6 @@ export type {
     RunRulesOptions,
     RuleExecutionStrategy,
 } from "./workflow/workflow";
-export { ResourceDocWorkflow } from "./workflow/implement/resource-doc/resource-doc-workflow";
-export {
-    FrontmatterExistsRule,
-    H1StructureRule,
-    ExampleUsageStructureRule,
-    RESOURCE_DOC_RULES,
-} from "./workflow/implement/resource-doc/rules";
 export {
     ResourceCheckWorkflow,
 } from "./workflow/implement/resource-check/resource-check-workflow";
@@ -81,7 +74,6 @@ export type {
     IntentDetectionResult,
     DetectionStatus,
 } from "./tools/llm";
-export { DescriptionIntentClassifier } from "./workflow/implement/resource-doc/rules/argument-reference-structure";
 
 // ── LLM ──
 export { createModel } from "./tools/llm";

@@ -14,8 +14,8 @@ locally and in CI.
 
 Current built-in workflow:
 
-- `resource-doc`: validates Terraform resource documentation structure and
-  selected description formats.
+- `resource-check`: validates Terraform resources by cross-checking provider
+  schemas and documentation artifacts.
 
 ## Repository Structure
 
@@ -24,16 +24,6 @@ This is a pnpm workspace monorepo:
 - `packages/core`: core checking engine, workflows, rules, parsers, LLM helpers
 - `packages/cli`: command-line interface (`code-check`)
 - `packages/core-test`: Vitest test suite for core and CLI behavior
-
-## Built-in Rules (`resource-doc`)
-
-The default `resource-doc` workflow registers these rules:
-
-- `frontmatter-exists`
-- `h1-structure`
-- `example-usage-structure`
-- `argument-reference-structure`
-- `attributes-reference-structure`
 
 ## Prerequisites
 
@@ -63,29 +53,22 @@ pnpm build
 node packages/cli/dist/index.js list workflow
 ```
 
-Check a Markdown file with workflow auto-detection:
-
-```bash
-node packages/cli/dist/index.js ./docs/resource.md
-```
-
 Run a specific workflow explicitly:
 
 ```bash
-node packages/cli/dist/index.js resource-doc ./docs/resource.md
+node packages/cli/dist/index.js resource-check <providerRoot> <serviceName> <resourceName> <resourceType>
 ```
 
 You can also use the root script:
 
 ```bash
 pnpm cli -- list workflow
-pnpm cli -- resource-doc ./docs/resource.md
+pnpm cli -- resource-check <providerRoot> <serviceName> <resourceName> <resourceType>
 ```
 
 ## CLI Reference
 
 ```text
-code-check <file.md>
 code-check <workflow_name> <file_path>
 code-check list workflow
 ```

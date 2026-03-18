@@ -11,18 +11,15 @@ import { DefaultResourceResolver } from "./resolver/resource-resolver";
 
 const USAGE = `
 Usage:
-  code-check <file.md>                  Check a Markdown file (auto-detect workflow)
   code-check <workflow_name> <file_path>  Run a specific workflow on a file
-                                         Example: code-check resource-doc ./docs/resource.md
+                                         Example: code-check resource-check ./path/to/input
   code-check resource-check <providerRoot> <serviceName> <resourceName> <resourceType>
                                          Run resource-check workflow
                                          resourceType: resource | data-source
   code-check list workflow              List available workflows
 `;
 
-const WORKFLOW_BY_EXT: Record<string, string> = {
-  ".md": "resource-doc",
-};
+const WORKFLOW_BY_EXT: Record<string, string> = {};
 
 function inferWorkflow(filePath: string): string | undefined {
   const ext = path.extname(filePath).toLowerCase();

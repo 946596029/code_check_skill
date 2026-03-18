@@ -9,7 +9,7 @@ describe("CLI reporter", () => {
 
   it("prints required fields for failed result with range", () => {
     const report: CheckReport = {
-      workflowId: "resource-doc",
+      workflowId: "demo-workflow",
       results: [
         {
           ruleName: "demo-rule",
@@ -50,7 +50,7 @@ describe("CLI reporter", () => {
 
   it("prints no-range placeholder when range is missing", () => {
     const report: CheckReport = {
-      workflowId: "resource-doc",
+      workflowId: "demo-workflow",
       results: [
         {
           ruleName: "demo-rule",
@@ -78,7 +78,7 @@ describe("CLI reporter", () => {
 
   it("prints required fields for passed rule result", () => {
     const report: CheckReport = {
-      workflowId: "resource-doc",
+      workflowId: "demo-workflow",
       results: [
         {
           ruleName: "demo-rule",
@@ -110,7 +110,7 @@ describe("CLI reporter", () => {
 
   it("prints complete result tree with success and failure fields", () => {
     const report: CheckReport = {
-      workflowId: "resource-doc",
+      workflowId: "demo-workflow",
       results: [
         {
           ruleName: "demo-rule",
@@ -171,7 +171,7 @@ describe("CLI reporter", () => {
     ].join("\n");
 
     const report: CheckReport = {
-      workflowId: "resource-doc",
+      workflowId: "demo-workflow",
       results: [
         {
           ruleName: "demo-rule",
@@ -209,7 +209,7 @@ describe("CLI reporter", () => {
     ].join("\n");
 
     const report: CheckReport = {
-      workflowId: "resource-doc",
+      workflowId: "demo-workflow",
       results: [
         {
           ruleName: "demo-rule",
@@ -243,7 +243,7 @@ describe("CLI reporter", () => {
 
   it("hides original/suggested when they are identical", () => {
     const report: CheckReport = {
-      workflowId: "resource-doc",
+      workflowId: "demo-workflow",
       results: [
         {
           ruleName: "demo-rule",

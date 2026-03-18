@@ -11,7 +11,7 @@
 
 当前内置工作流：
 
-- `resource-doc`：校验 Terraform 资源文档的结构，以及部分描述格式。
+- `resource-check`：通过关联 provider schema 与文档工件，对 Terraform 资源进行检查。
 
 ## 仓库结构
 
@@ -20,16 +20,6 @@
 - `packages/core`：核心检查引擎、工作流、规则、解析器、LLM 辅助工具
 - `packages/cli`：命令行工具（`code-check`）
 - `packages/core-test`：用于 core 与 CLI 行为的 Vitest 测试集
-
-## 内置规则（`resource-doc`）
-
-默认的 `resource-doc` 工作流会注册以下规则：
-
-- `frontmatter-exists`
-- `h1-structure`
-- `example-usage-structure`
-- `argument-reference-structure`
-- `attributes-reference-structure`
 
 ## 前置要求
 
@@ -59,29 +49,22 @@ pnpm build
 node packages/cli/dist/index.js list workflow
 ```
 
-通过自动识别工作流来检查 Markdown 文件：
-
-```bash
-node packages/cli/dist/index.js ./docs/resource.md
-```
-
 显式指定某个工作流运行：
 
 ```bash
-node packages/cli/dist/index.js resource-doc ./docs/resource.md
+node packages/cli/dist/index.js resource-check <providerRoot> <serviceName> <resourceName> <resourceType>
 ```
 
 你也可以使用根目录脚本：
 
 ```bash
 pnpm cli -- list workflow
-pnpm cli -- resource-doc ./docs/resource.md
+pnpm cli -- resource-check <providerRoot> <serviceName> <resourceName> <resourceType>
 ```
 
 ## CLI 参考
 
 ```text
-code-check <file.md>
 code-check <workflow_name> <file_path>
 code-check list workflow
 ```

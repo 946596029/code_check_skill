@@ -4,7 +4,6 @@ import {
   Workflow,
   Rule,
   RuleCheckResult,
-  ResourceDocWorkflow,
 } from "@code-check/core";
 import type { Context } from "@code-check/core";
 import type { WorkflowStage } from "@code-check/core";
@@ -169,14 +168,12 @@ describe("CodeChecker", () => {
 
     it("should register multiple workflows", () => {
       checker.registerWorkflow(new SimpleWorkflow());
-      checker.registerWorkflow(new ResourceDocWorkflow());
 
       const workflows = checker.listWorkflows();
-      expect(workflows).toHaveLength(2);
+      expect(workflows).toHaveLength(1);
 
       const ids = workflows.map((w) => w.id);
       expect(ids).toContain("simple-test");
-      expect(ids).toContain("resource-doc");
     });
   });
 
@@ -238,48 +235,5 @@ describe("CodeChecker", () => {
     });
   });
 
-  describe("check with ResourceDocWorkflow", () => {
-    beforeEach(() => {
-      checker.registerWorkflow(new ResourceDocWorkflow());
-    });
-
-    it("should detect missing frontmatter", async () => {
-      const report = await checker.check({
-        code: "# Hello\n\nSome content",
-        workflowId: "resource-doc",
-      });
-
-      const frontmatterResult = report.results.find(
-        (r) => r.ruleName.toLowerCase().includes("frontmatter")
-      );
-      expect(frontmatterResult).toBeDefined();
-      expect(frontmatterResult!.results.length).toBeGreaterThanOrEqual(1);
-      expect(frontmatterResult!.results[0].success).toBe(false);
-    });
-
-    it("should pass when frontmatter exists", async () => {
-      const code = [
-        "---",
-        "title: Test",
-        "---",
-        "",
-        "# Hello",
-        "",
-        "Some content",
-      ].join("\n");
-
-      const report = await checker.check({
-        code,
-        workflowId: "resource-doc",
-      });
-
-      const frontmatterResult = report.results.find(
-        (r) => r.ruleName.toLowerCase().includes("frontmatter")
-      );
-      expect(frontmatterResult).toBeDefined();
-      expect(frontmatterResult!.results).toHaveLength(1);
-      expect(frontmatterResult!.results[0].success).toBe(true);
-      expect(frontmatterResult!.results[0].range).toBeDefined();
-    });
-  });
+  // ResourceDocWorkflow tests removed with workflow deletion.
 });

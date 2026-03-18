@@ -16,16 +16,18 @@ import {
     MarkdownParser,
     RuleCheckResult,
     Context,
+    DocSemanticView,
 } from "@code-check/core";
 import type {
     ResourceCheckInput,
     CheckReport,
-    DocStructure,
-    DocArgument,
-    DocAttribute,
     SchemaSemanticView,
     SemanticField,
     ResourceSchema,
+    Argument,
+    Attribute,
+    ArgumentList,
+    AttributeList,
 } from "@code-check/core";
 
 const EXAMPLE_ROOT = path.resolve(
@@ -430,7 +432,7 @@ describe("buildSchemaSemanticView", () => {
 
 describe("ArgumentSectionSemanticRule", () => {
     const CTX_SCHEMA_SEMANTIC_VIEW = "resource-check.stage.schemaSemanticView";
-    const CTX_DOC_STRUCTURE = "resource-check.stage.docStructure";
+    const CTX_DOC_SEMANTIC_VIEW = "resource-check.stage.docSemanticView";
 
     function makeField(overrides: Partial<SemanticField> = {}): SemanticField {
         return {
@@ -456,32 +458,41 @@ describe("ArgumentSectionSemanticRule", () => {
         };
     }
 
-    function makeDocArg(overrides: Partial<DocArgument> = {}): DocArgument {
+    function makeArg(overrides: Partial<Argument> = {}): Argument {
         return {
             name: "test_field",
-            modifier: "Required",
-            type: "String",
             tags: [],
-            descriptionText: "the test field.",
-            startLine: 10,
+            description: "the test field.",
+            details: { text: "", children: [] },
+            arguments: [],
+            sourceRange: { start: { line: 10, column: 1 }, end: { line: 10, column: 1 } },
             ...overrides,
         };
     }
 
-    function makeDocStructure(args: DocArgument[]): DocStructure {
+    function makeArgList(args: Argument[]): ArgumentList {
         return {
-            frontmatter: null,
-            resourceName: null,
-            expectedDescription: null,
+            title: "Argument Reference",
+            description: "",
+            isComputed: () => false,
             arguments: args,
-            attributes: [],
         };
     }
 
-    function buildCtx(view: SchemaSemanticView, doc: DocStructure): Context {
+    function makeDocSemanticView(args: Argument[]): DocSemanticView {
+        return new DocSemanticView([
+            {
+                kind: "ArgumentList",
+                astRef: [],
+                node: makeArgList(args),
+            },
+        ]);
+    }
+
+    function buildCtx(view: SchemaSemanticView, docView: DocSemanticView): Context {
         const ctx = new Context();
         ctx.set(CTX_SCHEMA_SEMANTIC_VIEW, view);
-        ctx.set(CTX_DOC_STRUCTURE, doc);
+        ctx.set(CTX_DOC_SEMANTIC_VIEW, docView);
         return ctx;
     }
 
@@ -509,17 +520,16 @@ describe("ArgumentSectionSemanticRule", () => {
             description: "The status.",
         });
         const view = makeView(new Map([["status", field]]));
-        const doc = makeDocStructure([
-            makeDocArg({
+        const docView = makeDocSemanticView([
+            makeArg({
                 name: "status",
-                modifier: "Optional",
                 tags: [],
-                descriptionText: "the status.",
+                description: "the status.",
             }),
         ]);
 
         const rule = new ArgumentSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         const msgs = collectFailureMessages(results);
         expect(msgs.every((m) => !m.includes("Computed"))).toBe(true);
     });
@@ -533,17 +543,16 @@ describe("ArgumentSectionSemanticRule", () => {
             description: "The status.",
         });
         const view = makeView(new Map([["status", field]]));
-        const doc = makeDocStructure([
-            makeDocArg({
+        const docView = makeDocSemanticView([
+            makeArg({
                 name: "status",
-                modifier: "Optional",
                 tags: ["Computed"],
-                descriptionText: "the status.",
+                description: "the status.",
             }),
         ]);
 
         const rule = new ArgumentSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         const msgs = collectFailureMessages(results);
         expect(msgs.every((m) => !m.includes("Computed"))).toBe(true);
     });
@@ -554,15 +563,15 @@ describe("ArgumentSectionSemanticRule", () => {
             description: "The ID of the dedicated instance.",
         });
         const view = makeView(new Map([["instance_id", field]]));
-        const doc = makeDocStructure([
-            makeDocArg({
+        const docView = makeDocSemanticView([
+            makeArg({
                 name: "instance_id",
-                descriptionText: "the ID of the dedicated instance.",
+                description: "the ID of the dedicated instance.",
             }),
         ]);
 
         const rule = new ArgumentSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         const msgs = collectFailureMessages(results);
         expect(msgs.every((m) => !m.includes("description"))).toBe(true);
     });
@@ -573,15 +582,15 @@ describe("ArgumentSectionSemanticRule", () => {
             description: "The ID of the dedicated instance.",
         });
         const view = makeView(new Map([["instance_id", field]]));
-        const doc = makeDocStructure([
-            makeDocArg({
+        const docView = makeDocSemanticView([
+            makeArg({
                 name: "instance_id",
-                descriptionText: "the identifier of the instance.",
+                description: "the identifier of the instance.",
             }),
         ]);
 
         const rule = new ArgumentSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         const msgs = collectFailureMessages(results);
         expect(msgs.some((m) => m.includes("description should start with"))).toBe(true);
     });
@@ -592,15 +601,15 @@ describe("ArgumentSectionSemanticRule", () => {
             description: "An unique name of the resource.",
         });
         const view = makeView(new Map([["name", field]]));
-        const doc = makeDocStructure([
-            makeDocArg({
+        const docView = makeDocSemanticView([
+            makeArg({
                 name: "name",
-                descriptionText: "an unique name of the resource.",
+                description: "an unique name of the resource.",
             }),
         ]);
 
         const rule = new ArgumentSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         const msgs = collectFailureMessages(results);
         expect(msgs.every((m) => !m.includes("description"))).toBe(true);
     });
@@ -608,7 +617,7 @@ describe("ArgumentSectionSemanticRule", () => {
 
 describe("AttributeSectionSemanticRule", () => {
     const CTX_SCHEMA_SEMANTIC_VIEW = "resource-check.stage.schemaSemanticView";
-    const CTX_DOC_STRUCTURE = "resource-check.stage.docStructure";
+    const CTX_DOC_SEMANTIC_VIEW = "resource-check.stage.docSemanticView";
 
     function makeAttrField(overrides: Partial<SemanticField> = {}): SemanticField {
         return {
@@ -634,29 +643,39 @@ describe("AttributeSectionSemanticRule", () => {
         };
     }
 
-    function makeDocAttr(overrides: Partial<DocAttribute> = {}): DocAttribute {
+    function makeAttr(overrides: Partial<Attribute> = {}): Attribute {
         return {
             name: "test_attr",
-            descriptionText: "The test attribute.",
-            startLine: 50,
+            description: "The test attribute.",
+            details: { text: "", children: [] },
+            attributes: [],
+            sourceRange: { start: { line: 50, column: 1 }, end: { line: 50, column: 1 } },
             ...overrides,
         };
     }
 
-    function makeAttrDocStructure(attrs: DocAttribute[]): DocStructure {
+    function makeAttrList(attrs: Attribute[]): AttributeList {
         return {
-            frontmatter: null,
-            resourceName: null,
-            expectedDescription: null,
-            arguments: [],
+            title: "Attribute Reference",
+            description: "",
             attributes: attrs,
         };
     }
 
-    function buildCtx(view: SchemaSemanticView, doc: DocStructure): Context {
+    function makeAttrDocSemanticView(attrs: Attribute[]): DocSemanticView {
+        return new DocSemanticView([
+            {
+                kind: "AttributeList",
+                astRef: [],
+                node: makeAttrList(attrs),
+            },
+        ]);
+    }
+
+    function buildCtx(view: SchemaSemanticView, docView: DocSemanticView): Context {
         const ctx = new Context();
         ctx.set(CTX_SCHEMA_SEMANTIC_VIEW, view);
-        ctx.set(CTX_DOC_STRUCTURE, doc);
+        ctx.set(CTX_DOC_SEMANTIC_VIEW, docView);
         return ctx;
     }
 
@@ -681,15 +700,15 @@ describe("AttributeSectionSemanticRule", () => {
             description: "The weight value of the channel member.",
         });
         const view = makeAttrView(new Map([["weight", field]]));
-        const doc = makeAttrDocStructure([
-            makeDocAttr({
+        const docView = makeAttrDocSemanticView([
+            makeAttr({
                 name: "weight",
-                descriptionText: "The weight value of the channel member.",
+                description: "The weight value of the channel member.",
             }),
         ]);
 
         const rule = new AttributeSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         expect(results[0].success).toBe(true);
     });
 
@@ -699,15 +718,15 @@ describe("AttributeSectionSemanticRule", () => {
             description: "The weight value of the channel member.",
         });
         const view = makeAttrView(new Map([["weight", field]]));
-        const doc = makeAttrDocStructure([
-            makeDocAttr({
+        const docView = makeAttrDocSemanticView([
+            makeAttr({
                 name: "weight",
-                descriptionText: "The member weight.",
+                description: "The member weight.",
             }),
         ]);
 
         const rule = new AttributeSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         const msgs = collectFailureMessages(results);
         expect(msgs.some((m) => m.includes("description should be"))).toBe(true);
     });
@@ -718,15 +737,15 @@ describe("AttributeSectionSemanticRule", () => {
             description: "",
         });
         const view = makeAttrView(new Map([["weight", field]]));
-        const doc = makeAttrDocStructure([
-            makeDocAttr({
+        const docView = makeAttrDocSemanticView([
+            makeAttr({
                 name: "weight",
-                descriptionText: "Some arbitrary text.",
+                description: "Some arbitrary text.",
             }),
         ]);
 
         const rule = new AttributeSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         expect(results[0].success).toBe(true);
     });
 
@@ -736,15 +755,15 @@ describe("AttributeSectionSemanticRule", () => {
             description: "The creation time.",
         });
         const view = makeAttrView(new Map([["create_time", field]]));
-        const doc = makeAttrDocStructure([
-            makeDocAttr({
+        const docView = makeAttrDocSemanticView([
+            makeAttr({
                 name: "unknown_attr",
-                descriptionText: "Something.",
+                description: "Something.",
             }),
         ]);
 
         const rule = new AttributeSectionSemanticRule();
-        const results = await rule.test("", undefined, buildCtx(view, doc));
+        const results = await rule.test("", undefined, buildCtx(view, docView));
         const msgs = collectFailureMessages(results);
         expect(msgs.some((m) => m.includes("missing from the document"))).toBe(true);
         expect(msgs.some((m) => m.includes("not found in the schema"))).toBe(true);
