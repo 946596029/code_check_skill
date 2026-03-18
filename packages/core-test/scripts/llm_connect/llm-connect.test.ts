@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createModel } from "@code-check/core";
+import { createModel } from "../../../core/src/tools/llm/model";
 
 const runConnectivityTest =
   process.env.RUN_LLM_CONNECT_TEST === "1" ||

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getFormatSpec, type DescriptionIntent } from "@code-check/core";
+import { getFormatSpec, type DescriptionIntent } from "../../../core/src/tools/llm/description-intent";
 
 describe("DescriptionFormatSpec — value-range", () => {
     const spec = getFormatSpec("value-range")!;

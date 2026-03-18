@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { RuleCheckResult, type CheckReport } from "@code-check/core";
+import type { CheckReport } from "@code-check/core";
+import { RuleCheckResult } from "../../core/src/workflow/types/rule/rule";
 import { printReport } from "../../cli/src/reporter";
 
 describe("CLI reporter", () => {

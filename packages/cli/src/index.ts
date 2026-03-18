@@ -2,11 +2,11 @@
 
 import path from "path";
 import { CodeChecker } from "@code-check/core";
-import type { ResourceCheckInput } from "@code-check/core";
 import { setupChecker } from "./setup";
 import { listWorkflowCommand } from "./commands/list-workflow";
 import { checkCommand } from "./commands/check";
 import { resourceCheckCommand } from "./commands/resource-check";
+import type { ResourceCheckInput } from "./commands/resource-check";
 import { DefaultResourceResolver } from "./resolver/resource-resolver";
 
 const USAGE = `

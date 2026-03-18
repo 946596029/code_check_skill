@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { MarkdownParser } from "@code-check/core";
+import { MarkdownParser } from "../../../core/src/tools/ast-parser/markdown";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const inputFile = resolve(__dirname, "apig_channel_member.md");

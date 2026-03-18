@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   Rule,
   RuleCheckResult,
-} from "@code-check/core";
+} from "../../../core/src/workflow/types/rule/rule";
 
 describe("RuleCheckResult", () => {
   it("should create instance with all properties", () => {

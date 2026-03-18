@@ -2,9 +2,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
     CodeChecker,
-    ResourceCheckWorkflow,
 } from "@code-check/core";
-import type { ResourceCheckInput, CheckReport } from "@code-check/core";
+import type { CheckReport } from "@code-check/core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,6 +11,13 @@ const EXAMPLE_ROOT = path.resolve(
     __dirname,
     "../../terraform_provider_example"
 );
+
+type ResourceCheckInput = {
+    providerRoot: string;
+    serviceName: string;
+    resourceName: string;
+    resourceType: "resource" | "data-source";
+};
 
 const DEFAULT_INPUT: ResourceCheckInput = {
     providerRoot: EXAMPLE_ROOT,
@@ -72,9 +78,6 @@ async function main(): Promise<void> {
 
     const checker = new CodeChecker();
     await checker.initialize();
-
-    const workflow = new ResourceCheckWorkflow();
-    checker.registerWorkflow(workflow);
 
     const code = JSON.stringify(input);
     const report = await checker.check({ code, workflowId: "resource-check" });

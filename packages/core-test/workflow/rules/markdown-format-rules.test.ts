@@ -6,8 +6,8 @@ import {
     BlankLineBetweenBlocksRule,
     H1ExistsRule,
     ExampleSectionExistsRule,
-    MarkdownParser,
-} from "@code-check/core";
+} from "../../../core/src/workflow/implement/resource-check/rules";
+import { MarkdownParser } from "../../../core/src/tools/ast-parser/markdown";
 
 const parser = new MarkdownParser();
 

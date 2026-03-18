@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-    GoParser,
     TerraformSchemaExtractor,
     TerraformSchemaSemanticNormalizer,
-} from "@code-check/core";
+} from "../../../core/src/workflow/implement/resource-check/tools/terraform-schema";
+import { GoParser } from "../../../core/src/tools/ast-parser/go";
 
 const SEMANTIC_SOURCE = `
 package huaweicloud

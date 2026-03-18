@@ -1,6 +1,12 @@
 import { CodeChecker } from "@code-check/core";
-import type { ResourceCheckInput } from "@code-check/core";
 import { printReport } from "../reporter";
+
+export type ResourceCheckInput = {
+  providerRoot: string;
+  serviceName: string;
+  resourceName: string;
+  resourceType: "resource" | "data-source";
+};
 
 export async function resourceCheckCommand(
   checker: CodeChecker,

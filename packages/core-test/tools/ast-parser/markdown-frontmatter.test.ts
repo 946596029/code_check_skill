@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { MarkdownParser } from "@code-check/core";
-import type { MarkdownNode } from "@code-check/core";
+import { MarkdownParser } from "../../../core/src/tools/ast-parser/markdown";
+import type { MarkdownNode } from "../../../core/src/tools/ast-parser/markdown";
 
 describe("MarkdownParser - Frontmatter Support", () => {
   describe("parse() with front-matter", () => {

@@ -1,4 +1,5 @@
 import { Workflow } from "../workflow/workflow";
+import { ResourceCheckWorkflow } from "../workflow/implement/resource-check/resource-check-workflow";
 import {
   CodeCheckerConfig,
   CheckOptions,
@@ -29,6 +30,9 @@ export class CodeChecker {
         process.env.QWEN_MODEL = this.config.llm.model;
       }
     }
+
+    // Register built-in workflows (public behavior, internal implementation).
+    this.registerWorkflow(new ResourceCheckWorkflow());
 
     this.initialized = true;
   }

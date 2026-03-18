@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
-import { StructuredCaller, extractJson } from "@code-check/core";
+import { StructuredCaller, extractJson } from "../../../core/src/tools/llm/structured-caller";
 
 // ── Helper: minimal mock that satisfies BaseChatModel.invoke() ──
 

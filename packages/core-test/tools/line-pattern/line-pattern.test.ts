@@ -9,7 +9,7 @@ import {
     keyword,
     rest,
     optional,
-} from "@code-check/core";
+} from "../../../core/src/tools/line-pattern";
 
 const MODIFIERS = ["Required", "Optional"];
 const TYPES = ["String", "Int", "Bool", "List", "Map", "Float", "Set"];

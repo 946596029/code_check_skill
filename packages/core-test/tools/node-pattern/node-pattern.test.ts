@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import type { MarkdownNode } from "@code-check/core";
 import {
     NodePattern,
     heading,
@@ -16,7 +15,8 @@ import {
     optionalGroup,
     zeroOrMoreGroup,
     oneOrMoreGroup,
-} from "@code-check/core";
+} from "../../../core/src/tools/node-pattern";
+import type { MarkdownNode } from "../../../core/src/tools/ast-parser/markdown";
 
 function mkNode(
     overrides: Partial<MarkdownNode> & Pick<MarkdownNode, "type">

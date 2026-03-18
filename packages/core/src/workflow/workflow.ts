@@ -174,13 +174,13 @@ export abstract class Workflow implements LifeCycle {
         this.setCode(code);
       },
       setArtifact: <T>(key: string, value: T, targetCtx?: Context) => {
-        (targetCtx ?? this.context).set(key, value);
+        (targetCtx ?? self.context).set(key, value);
       },
       getArtifact: <T>(key: string, sourceCtx?: Context) => {
-        return (sourceCtx ?? this.context).get<T>(key);
+        return (sourceCtx ?? self.context).get<T>(key);
       },
       createChildContext: (parentCtx?: Context) => {
-        return (parentCtx ?? this.context).createChild();
+        return (parentCtx ?? self.context).createChild();
       },
       runRules: async (options?: RunRulesOptions) => {
         const result = await this.runRules(options, onRuleComplete);

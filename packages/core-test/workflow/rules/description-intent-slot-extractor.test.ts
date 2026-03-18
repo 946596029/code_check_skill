@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractSlotsForIntent } from "@code-check/core";
+import { extractSlotsForIntent } from "../../../core/src/tools/llm/description-intent";
 
 describe("extractSlotsForIntent", () => {
     it("extracts value-range slots", () => {

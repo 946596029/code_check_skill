@@ -1,5 +1,6 @@
-import { CodeChecker, ResourceCheckWorkflow } from "@code-check/core";
+import { CodeChecker } from "@code-check/core";
 
 export function setupChecker(checker: CodeChecker): void {
-  checker.registerWorkflow(new ResourceCheckWorkflow());
+  // Built-in workflows are registered in CodeChecker.initialize().
+  void checker;
 }

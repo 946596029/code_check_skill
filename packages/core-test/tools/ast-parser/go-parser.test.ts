@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { GoParser } from "@code-check/core";
+import { GoParser } from "../../../core/src/tools/ast-parser/go";
 
 describe("GoParser", () => {
     let parser: GoParser;

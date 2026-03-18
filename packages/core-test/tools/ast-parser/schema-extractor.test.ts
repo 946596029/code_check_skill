@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
-import { GoParser, TerraformSchemaExtractor } from "@code-check/core";
-import type { ResourceSchema, SchemaField } from "@code-check/core";
+import { GoParser } from "../../../core/src/tools/ast-parser/go";
+import {
+  TerraformSchemaExtractor,
+} from "../../../core/src/workflow/implement/resource-check/tools/terraform-schema";
+import type {
+  ResourceSchema,
+  SchemaField,
+} from "../../../core/src/workflow/implement/resource-check/tools/terraform-schema";
 
 const SIMPLE_SCHEMA = `
 package huaweicloud

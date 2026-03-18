@@ -1,9 +1,18 @@
-import type {
-  CheckReport,
-  RuleResult,
-  RuleCheckResult,
-  SourceRange,
-} from "@code-check/core";
+import type { CheckReport } from "@code-check/core";
+
+type RuleResult = CheckReport["results"][number];
+
+type SourcePosition = { line: number; column: number };
+type SourceRange = { start: SourcePosition; end: SourcePosition };
+
+type RuleCheckResult = {
+  success: boolean;
+  message?: string;
+  original?: string;
+  suggested?: string;
+  children?: RuleCheckResult[];
+  range?: SourceRange;
+};
 
 const SEPARATOR = "─".repeat(60);
 const INDENT = "  ";
@@ -103,15 +112,17 @@ function printResultTree(
   }
 
   if (!result.success) {
+    const original = result.original;
+    const suggested = result.suggested;
     const hasSuggestion =
-      result.original &&
-      result.suggested &&
-      result.original !== result.suggested;
+      typeof original === "string" &&
+      typeof suggested === "string" &&
+      original !== suggested;
     if (hasSuggestion) {
       console.log(`${treeIndent}original:`);
-      printCodeBlock(result.original, MAX_CODE_LINES);
+      printCodeBlock(original, MAX_CODE_LINES);
       console.log(`${treeIndent}suggested:`);
-      printCodeBlock(result.suggested, MAX_CODE_LINES);
+      printCodeBlock(suggested, MAX_CODE_LINES);
     }
   }
 

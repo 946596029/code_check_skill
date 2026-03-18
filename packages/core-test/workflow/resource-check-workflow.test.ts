@@ -1,25 +1,25 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "path";
+import { CodeChecker } from "@code-check/core";
 import {
-    CodeChecker,
-    ResourceCheckWorkflow,
     parseResourceCheckInput,
     resolveResourcePaths,
-    buildSchemaSemanticView,
-    GoParser,
+    DocSemanticView,
+} from "../../core/src/workflow/implement/resource-check/types";
+import { buildSchemaSemanticView } from "../../core/src/workflow/implement/resource-check/tools/schema-semantic";
+import { GoParser } from "../../core/src/tools/ast-parser/go";
+import {
     TerraformSchemaExtractor,
     TerraformSchemaSemanticNormalizer,
-    SectionExistenceRule,
-    ArgumentSectionSemanticRule,
-    AttributeSectionSemanticRule,
-    MarkdownParser,
-    RuleCheckResult,
-    Context,
-    DocSemanticView,
-} from "@code-check/core";
+} from "../../core/src/workflow/implement/resource-check/tools/terraform-schema";
+import { SectionExistenceRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/section-existence-rule";
+import { ArgumentSectionSemanticRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/argument-section-semantic-rule";
+import { AttributeSectionSemanticRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/attribute-section-semantic-rule";
+import { MarkdownParser } from "../../core/src/tools/ast-parser/markdown";
+import { Context } from "../../core/src/workflow/context/context";
+import type { RuleCheckResult } from "../../core/src/workflow/types/rule/rule";
 import type {
-    ResourceCheckInput,
     CheckReport,
     SchemaSemanticView,
     SemanticField,
@@ -28,7 +28,8 @@ import type {
     Attribute,
     ArgumentList,
     AttributeList,
-} from "@code-check/core";
+} from "../../core/src/workflow/implement/resource-check/types";
+import type { ResourceCheckInput } from "../../core/src/workflow/implement/resource-check/types";
 
 const EXAMPLE_ROOT = path.resolve(
     __dirname,
@@ -119,13 +120,10 @@ describe("resolveResourcePaths", () => {
 
 describe("ResourceCheckWorkflow", () => {
     let checker: CodeChecker;
-    let workflow: ResourceCheckWorkflow;
 
     beforeEach(async () => {
         checker = new CodeChecker();
         await checker.initialize();
-        workflow = new ResourceCheckWorkflow();
-        checker.registerWorkflow(workflow);
     });
 
     it("should appear in workflow list", () => {

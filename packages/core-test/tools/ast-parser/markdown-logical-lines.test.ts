@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MarkdownParser } from "@code-check/core";
+import { MarkdownParser } from "../../../core/src/tools/ast-parser/markdown";
 
 describe("MarkdownParser - getLogicalLines()", () => {
     const parser = new MarkdownParser();

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GoParser, TerraformSchemaExtractor } from "@code-check/core";
+import { GoParser } from "../../../core/src/tools/ast-parser/go";
+import { TerraformSchemaExtractor } from "../../../core/src/workflow/implement/resource-check/tools/terraform-schema";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const defaultInputFile = resolve(__dirname, "sample-provider.go");
