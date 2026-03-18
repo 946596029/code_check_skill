@@ -1,7 +1,8 @@
 import { Rule, RuleCheckResult, type RuleMeta } from "../../../../types/rule/rule";
 import type { Context } from "../../../../context/context";
-import type { SchemaSemanticView, DocStructure, DocAttribute, SemanticField } from "../../types";
-import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_STRUCTURE } from "../../context-keys";
+import type { SchemaSemanticView } from "../../types";
+import type { Attribute, DocSemanticView } from "../../tools/doc-semantic";
+import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../context-keys";
 
 const META: RuleMeta = {
     name: "attribute-section-semantic",
@@ -34,16 +35,16 @@ export class AttributeSectionSemanticRule extends Rule {
         }
 
         const view = parentCtx.get<SchemaSemanticView>(CTX_SCHEMA_SEMANTIC_VIEW);
-        const doc = parentCtx.get<DocStructure>(CTX_DOC_STRUCTURE);
-        if (!view || !doc) {
-            return [RuleCheckResult.pass("Schema view or doc structure unavailable, rule skipped")];
+        const docView = parentCtx.get<DocSemanticView>(CTX_DOC_SEMANTIC_VIEW);
+        if (!view || !docView) {
+            return [RuleCheckResult.pass("Schema view or doc semantic view unavailable, rule skipped")];
         }
 
         if (view.attributes.size === 0) {
             return [RuleCheckResult.pass("No schema attributes, attribute semantic check skipped")];
         }
 
-        const docAttrs = doc.attributes;
+        const docAttrs = docView.attributeLists.flatMap((list) => list.attributes);
         if (docAttrs.length === 0) {
             return [RuleCheckResult.pass(
                 "No doc attributes found, existence checked by SectionExistenceRule",
@@ -71,7 +72,7 @@ export class AttributeSectionSemanticRule extends Rule {
     }
 
     private checkCompleteness(
-        docAttrs: DocAttribute[],
+        docAttrs: Attribute[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -87,14 +88,15 @@ export class AttributeSectionSemanticRule extends Rule {
 
         for (const attr of docAttrs) {
             if (!view.attributes.has(attr.name)) {
+                const line = getStartLine(attr);
                 failures.push(
                     this.fail(
                         "extraInDoc",
                         "",
                         undefined,
-                        RuleCheckResult.fromLine(attr.startLine),
+                        RuleCheckResult.fromLine(line),
                         attr.name,
-                        attr.startLine,
+                        line,
                     ),
                 );
             }
@@ -102,7 +104,7 @@ export class AttributeSectionSemanticRule extends Rule {
     }
 
     private checkDescriptionAlignment(
-        docAttrs: DocAttribute[],
+        docAttrs: Attribute[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -111,25 +113,30 @@ export class AttributeSectionSemanticRule extends Rule {
             if (!field || !field.description) continue;
 
             const expected = field.description.trim();
-            const actual = attr.descriptionText.trim();
+            const actual = attr.description.trim();
             if (expected && actual !== expected) {
                 const previewLen = Math.min(expected.length + 20, 80);
                 const actualPreview = actual.length > previewLen
                     ? actual.slice(0, previewLen) + "..."
                     : actual;
+                const line = getStartLine(attr);
                 failures.push(
                     this.fail(
                         "descriptionMismatch",
                         "",
                         undefined,
-                        RuleCheckResult.fromLine(attr.startLine),
+                        RuleCheckResult.fromLine(line),
                         attr.name,
                         expected,
                         actualPreview,
-                        attr.startLine,
+                        line,
                     ),
                 );
             }
         }
     }
+}
+
+function getStartLine(attr: Attribute): number | undefined {
+    return attr.sourceRange?.start.line;
 }

@@ -50,7 +50,8 @@ export class TerraformSchemaSemanticNormalizer {
             }
 
             const nonUpdatable = this.deriveNonUpdatableFromCustomizeDiff(
-                options.customizeDiff, goSource,
+                options.customizeDiff,
+                goSource
             );
             if (nonUpdatable) {
                 semantics.nonUpdatable = nonUpdatable;
@@ -58,9 +59,7 @@ export class TerraformSchemaSemanticNormalizer {
         }
 
         if (options.hasImporter) {
-            const importId = this.deriveImportIdParts(
-                goSource, options.importerStateContext,
-            );
+            const importId = this.deriveImportIdParts(goSource, options.importerStateContext);
             if (importId) {
                 semantics.importIdParts = importId;
             }
@@ -142,9 +141,7 @@ export class TerraformSchemaSemanticNormalizer {
         customizeDiff: string,
         goSource: string
     ): ForceNewSemantics | undefined {
-        const fields = this.extractFieldsFromDiffCall(
-            customizeDiff, goSource, "config.FlexibleForceNew",
-        );
+        const fields = this.extractFieldsFromDiffCall(customizeDiff, goSource, "config.FlexibleForceNew");
         if (!fields || fields.length === 0) return undefined;
 
         return {
@@ -159,7 +156,9 @@ export class TerraformSchemaSemanticNormalizer {
         goSource: string
     ): NonUpdatableSemantics | undefined {
         const fields = this.extractFieldsFromDiffCall(
-            customizeDiff, goSource, "config.FlexibleNonUpdatable",
+            customizeDiff,
+            goSource,
+            "config.FlexibleNonUpdatable"
         );
         if (!fields || fields.length === 0) return undefined;
 
@@ -178,7 +177,7 @@ export class TerraformSchemaSemanticNormalizer {
     private extractFieldsFromDiffCall(
         customizeDiff: string,
         goSource: string,
-        funcName: string,
+        funcName: string
     ): string[] | undefined {
         const escaped = funcName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const pattern = new RegExp(`${escaped}\\(([\\s\\S]+?)\\)`, "m");
@@ -200,10 +199,7 @@ export class TerraformSchemaSemanticNormalizer {
      * - Custom function => look up the function body and parse
      *   `strings.Split(d.Id(), "/")` style patterns to infer parts.
      */
-    private deriveImportIdParts(
-        goSource: string,
-        stateContext?: string,
-    ): ImportIdSemantics | undefined {
+    private deriveImportIdParts(goSource: string, stateContext?: string): ImportIdSemantics | undefined {
         if (!stateContext) return undefined;
 
         if (
@@ -221,10 +217,7 @@ export class TerraformSchemaSemanticNormalizer {
 
     private findFuncBody(goSource: string, funcName: string): string | undefined {
         const escaped = funcName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const headerPattern = new RegExp(
-            `func\\s+${escaped}\\s*\\([\\s\\S]*?\\)\\s*[^{]*\\{`,
-            "m",
-        );
+        const headerPattern = new RegExp(`func\\s+${escaped}\\s*\\([\\s\\S]*?\\)\\s*[^{]*\\{`, "m");
         const headerMatch = goSource.match(headerPattern);
         if (!headerMatch) return undefined;
 
@@ -261,7 +254,7 @@ export class TerraformSchemaSemanticNormalizer {
      */
     private parseImportIdFromFuncBody(body: string): ImportIdSemantics | undefined {
         const splitMatch = body.match(
-            /strings\.SplitN?\(\s*(?:d\.Id\(\)|[a-zA-Z_]\w*)\s*,\s*"([^"]+)"\s*(?:,\s*(\d+)\s*)?\)/,
+            /strings\.SplitN?\(\s*(?:d\.Id\(\)|[a-zA-Z_]\w*)\s*,\s*"([^"]+)"\s*(?:,\s*(\d+)\s*)?\)/
         );
         if (!splitMatch) return undefined;
 
@@ -285,7 +278,7 @@ export class TerraformSchemaSemanticNormalizer {
 
         if (partsMap.size === 0) return undefined;
 
-        const expectedCount = splitCount ?? (Math.max(...partsMap.keys()) + 1);
+        const expectedCount = splitCount ?? Math.max(...partsMap.keys()) + 1;
         const parts: string[] = [];
         for (let i = 0; i < expectedCount; i++) {
             parts.push(partsMap.get(i) ?? `_unknown_${i}`);

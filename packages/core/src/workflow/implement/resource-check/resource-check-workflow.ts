@@ -2,40 +2,22 @@ import fs from "fs/promises";
 import { Workflow, type WorkflowStage } from "../../workflow";
 import { Rule, RuleCheckResult } from "../../types/rule/rule";
 import type { Context } from "../../context/context";
-import { GoParser, TerraformSchemaExtractor } from "../../../tools/ast-parser/go";
-import type { ResourceSchema, SchemaField } from "../../../tools/ast-parser/go";
+import { GoParser } from "../../../tools/ast-parser/go";
+import { TerraformSchemaExtractor } from "./tools/terraform-schema";
+import type { ResourceSchema } from "./tools/terraform-schema";
 import { MarkdownParser } from "../../../tools/ast-parser/markdown";
 import type { MarkdownNode } from "../../../tools/ast-parser/markdown";
-import {
-    LinePattern,
-    literal,
-    backticked,
-    spaces,
-    keyword,
-    rest,
-    csvParenthesized,
-} from "../../../tools/line-pattern";
+import { buildDocSemanticView, DocSemanticView } from "./tools/doc-semantic";
 import {
     parseResourceCheckInput,
     resolveResourcePaths,
 } from "./types";
-import type {
-    ResourceCheckInput,
-    DocStructure,
-    DocArgument,
-    DocAttribute,
-    SchemaSemanticView,
-    SemanticField,
-    TimeoutView,
-    ImportView,
-} from "./types";
+import { buildSchemaSemanticView } from "./tools/schema-semantic";
 import {
-    CTX_DOC_FRONTMATTER,
     CTX_DOC_MARKDOWN_AST,
     CTX_DOC_MD_PATH,
     CTX_DOC_MD_SOURCE,
-    CTX_DOC_RESOURCE_NAME,
-    CTX_DOC_STRUCTURE,
+    CTX_DOC_SEMANTIC_VIEW,
     CTX_HCL_STAGE_STATUS,
     CTX_IMPLEMENT_GO_PATH,
     CTX_IMPLEMENT_GO_SCHEMAS,
@@ -54,42 +36,6 @@ interface GoTestSummary {
     functionCount: number;
     testFunctionCount: number;
 }
-
-const MODIFIERS = ["Required", "Optional"];
-const TYPES = ["String", "Int", "Bool", "List", "Map", "Float", "Set"];
-const TAGS = [
-    "ForceNew",
-    "NonUpdatable",
-    "Deprecated",
-    "Computed",
-    "Sensitive",
-];
-
-const ARG_BULLET_PATTERN = new LinePattern([
-    literal("* "),
-    backticked("arg_name"),
-    spaces(1),
-    literal("-"),
-    spaces(1),
-    csvParenthesized([
-        { name: "Modifier", values: MODIFIERS },
-        { name: "Type", values: TYPES },
-        { name: "Tag", values: TAGS, zeroOrMore: true },
-    ]),
-    spaces(1),
-    keyword("Specifies"),
-    spaces(1),
-    rest("description"),
-]);
-
-const ATTR_BULLET_PATTERN = new LinePattern([
-    literal("* "),
-    backticked("attr_name"),
-    spaces(1),
-    literal("-"),
-    spaces(1),
-    rest("description"),
-]);
 
 export class ResourceCheckWorkflow extends Workflow {
     public readonly id = "resource-check";
@@ -183,40 +129,18 @@ export class ResourceCheckWorkflow extends Workflow {
             execute: async (runtime) => {
                 const source = runtime.getArtifact<string>(CTX_DOC_MD_SOURCE) ?? "";
                 if (!source.trim()) {
-                    runtime.setArtifact<DocStructure>(CTX_DOC_STRUCTURE, {
-                        frontmatter: null,
-                        resourceName: null,
-                        expectedDescription: null,
-                        arguments: [],
-                        attributes: [],
-                    });
+                    runtime.setArtifact(CTX_DOC_SEMANTIC_VIEW, new DocSemanticView());
                     return;
                 }
 
                 const ast = this.markdownParser.parse(source);
                 runtime.setArtifact(CTX_DOC_MARKDOWN_AST, ast);
-
-                const frontmatter = this.markdownParser.getFrontmatter(ast);
-                runtime.setArtifact(CTX_DOC_FRONTMATTER, frontmatter);
-
-                const resourceName = extractResourceName(frontmatter);
-                runtime.setArtifact(CTX_DOC_RESOURCE_NAME, resourceName);
-
-                const expectedDescription = normalizeDescription(
-                    frontmatter?.description,
+                const docSemanticView = buildDocSemanticView(
+                    ast,
+                    source,
+                    this.markdownParser,
                 );
-
-                const args = extractArguments(this.markdownParser, source, ast);
-                const attrs = extractAttributes(this.markdownParser, source, ast);
-
-                const structure: DocStructure = {
-                    frontmatter,
-                    resourceName,
-                    expectedDescription,
-                    arguments: args,
-                    attributes: attrs,
-                };
-                runtime.setArtifact(CTX_DOC_STRUCTURE, structure);
+                runtime.setArtifact(CTX_DOC_SEMANTIC_VIEW, docSemanticView);
             },
         };
     }
@@ -332,11 +256,13 @@ export class ResourceCheckWorkflow extends Workflow {
                 runtime.setArtifact(CTX_SCHEMA_SEMANTIC_VIEW, view);
 
                 const ast = runtime.getArtifact<MarkdownNode>(CTX_DOC_MARKDOWN_AST);
-                const docStructure = runtime.getArtifact<DocStructure>(CTX_DOC_STRUCTURE);
+                const docSemanticView = runtime.getArtifact<DocSemanticView>(
+                    CTX_DOC_SEMANTIC_VIEW,
+                );
 
                 const checkCtx = runtime.createChildContext();
                 checkCtx.set(CTX_SCHEMA_SEMANTIC_VIEW, view);
-                checkCtx.set(CTX_DOC_STRUCTURE, docStructure);
+                checkCtx.set(CTX_DOC_SEMANTIC_VIEW, docSemanticView);
                 checkCtx.set(CTX_DOC_MARKDOWN_AST, ast);
 
                 const savedCode = runtime.code;
@@ -462,196 +388,3 @@ async function readFileIfExists(filePath: string): Promise<string | undefined> {
     }
 }
 
-function extractResourceName(
-    frontmatter: Record<string, unknown> | null,
-): string | null {
-    if (!frontmatter) return null;
-    const pageTitle = frontmatter.page_title;
-    if (typeof pageTitle !== "string") return null;
-    const match = pageTitle.match(/:\s*(.+)$/);
-    return match ? match[1].trim() : pageTitle.trim();
-}
-
-function normalizeDescription(desc: unknown): string | null {
-    if (desc == null) return null;
-    const s = typeof desc === "string" ? desc : String(desc);
-    return s.replace(/\r\n/g, "\n").trim();
-}
-
-function extractArguments(
-    parser: MarkdownParser,
-    source: string,
-    ast: MarkdownNode,
-): DocArgument[] {
-    const section = parser.getSection(ast, 2, "Argument Reference");
-    if (!section) return [];
-
-    const listNodes = parser.filterByType(section, "list");
-    const items = parser.getBulletItems(listNodes);
-    const args: DocArgument[] = [];
-
-    for (const item of items) {
-        const bullet = parser.getItemBulletLine(source, item);
-        if (!bullet) continue;
-
-        const result = ARG_BULLET_PATTERN.match(bullet.text);
-        if (!result.ok) continue;
-
-        const captures = result.value.captures;
-        const name = captures[1].replace(/`/g, "");
-        const parenContent = captures[5].replace(/^\(/, "").replace(/\)$/, "");
-        const parts = parenContent.split(/,\s*/);
-
-        const modifier = parts[0] ?? "";
-        const type = parts[1] ?? "";
-        const tags = parts.slice(2);
-        const descriptionText = captures[captures.length - 1] ?? "";
-
-        args.push({
-            name,
-            modifier,
-            type,
-            tags,
-            descriptionText,
-            startLine: bullet.startLine,
-        });
-    }
-
-    return args;
-}
-
-function extractAttributes(
-    parser: MarkdownParser,
-    source: string,
-    ast: MarkdownNode,
-): DocAttribute[] {
-    const section = parser.getSection(ast, 2, "Attributes Reference");
-    if (!section) return [];
-
-    const listNodes = parser.filterByType(section, "list");
-    const items = parser.getBulletItems(listNodes);
-    const attrs: DocAttribute[] = [];
-
-    for (const item of items) {
-        const bullet = parser.getItemBulletLine(source, item);
-        if (!bullet) continue;
-
-        const result = ATTR_BULLET_PATTERN.match(bullet.text);
-        if (!result.ok) continue;
-
-        const captures = result.value.captures;
-        const name = captures[1].replace(/`/g, "");
-        const descriptionText = captures[captures.length - 1] ?? "";
-
-        attrs.push({
-            name,
-            descriptionText,
-            startLine: bullet.startLine,
-        });
-    }
-
-    return attrs;
-}
-
-// ── Schema Semantic View builder ──
-
-export function buildSchemaSemanticView(schema: ResourceSchema): SchemaSemanticView {
-    const forceNewSet = new Set(schema.resourceSemantics?.forceNew?.fields ?? []);
-    const nonUpdatableSet = new Set(schema.resourceSemantics?.nonUpdatable?.fields ?? []);
-
-    const args = new Map<string, SemanticField>();
-    const attrs = new Map<string, SemanticField>();
-
-    for (const field of schema.fields) {
-        classifyField(field, forceNewSet, nonUpdatableSet, args, attrs);
-    }
-
-    return {
-        resourceName: schema.resourceName,
-        arguments: args,
-        attributes: attrs,
-        timeouts: buildTimeoutView(schema),
-        importInfo: buildImportView(schema),
-    };
-}
-
-function classifyField(
-    field: SchemaField,
-    forceNewSet: Set<string>,
-    nonUpdatableSet: Set<string>,
-    args: Map<string, SemanticField>,
-    attrs: Map<string, SemanticField>,
-): void {
-    const semantic = toSemanticField(field, forceNewSet, nonUpdatableSet);
-    if (field.required || field.optional) {
-        args.set(field.name, semantic);
-    } else {
-        attrs.set(field.name, semantic);
-    }
-}
-
-function toSemanticField(
-    field: SchemaField,
-    forceNewSet: Set<string>,
-    nonUpdatableSet: Set<string>,
-): SemanticField {
-    const result: SemanticField = {
-        name: field.name,
-        type: field.type,
-        required: field.required,
-        optional: field.optional,
-        computed: field.computed,
-        forceNew: field.forceNew || forceNewSet.has(field.name),
-        nonUpdatable: nonUpdatableSet.has(field.name),
-        description: field.description,
-    };
-
-    if (field.subFields && field.subFields.length > 0) {
-        result.subFields = field.subFields.map(
-            (sub) => toSemanticField(sub, forceNewSet, nonUpdatableSet),
-        );
-    }
-
-    return result;
-}
-
-function buildTimeoutView(schema: ResourceSchema): TimeoutView | null {
-    const timeouts = schema.resourceSemantics?.timeouts;
-    if (!timeouts) return null;
-
-    const view: TimeoutView = {};
-    let hasAny = false;
-
-    if (timeouts.create?.confidence === "high" && timeouts.create.milliseconds != null) {
-        view.create = timeouts.create.milliseconds;
-        hasAny = true;
-    }
-    if (timeouts.read?.confidence === "high" && timeouts.read.milliseconds != null) {
-        view.read = timeouts.read.milliseconds;
-        hasAny = true;
-    }
-    if (timeouts.update?.confidence === "high" && timeouts.update.milliseconds != null) {
-        view.update = timeouts.update.milliseconds;
-        hasAny = true;
-    }
-    if (timeouts.delete?.confidence === "high" && timeouts.delete.milliseconds != null) {
-        view.delete = timeouts.delete.milliseconds;
-        hasAny = true;
-    }
-
-    return hasAny ? view : null;
-}
-
-function buildImportView(schema: ResourceSchema): ImportView {
-    const semantics = schema.resourceSemantics;
-    const options = schema.resourceOptions;
-
-    const importable = semantics?.importable?.value ?? options?.hasImporter ?? false;
-    const stateFunc = options?.importerStateContext;
-
-    const idParts = semantics?.importIdParts?.confidence === "high"
-        ? semantics.importIdParts.parts
-        : undefined;
-
-    return { importable, stateFunc, idParts };
-}

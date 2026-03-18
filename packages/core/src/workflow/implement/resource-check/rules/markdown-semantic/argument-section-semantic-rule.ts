@@ -1,21 +1,20 @@
 import { Rule, RuleCheckResult, type RuleMeta } from "../../../../types/rule/rule";
 import type { Context } from "../../../../context/context";
-import type { SchemaSemanticView, DocStructure, DocArgument, SemanticField } from "../../types";
-import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_STRUCTURE } from "../../context-keys";
+import type { SchemaSemanticView, SemanticField } from "../../types";
+import type { Argument, DocSemanticView } from "../../tools/doc-semantic";
+import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../context-keys";
 
 const META: RuleMeta = {
     name: "argument-section-semantic",
     description:
         "Arguments in the Markdown document must align with the provider schema " +
-        "(ordering, modifiers, tags, completeness)",
+        "(ordering, tags, completeness)",
     messages: {
         regionNotFirst: (line: unknown) =>
             `Argument "region" must be the first argument, but found at line ${line}.`,
         orderViolation: (name: unknown, line: unknown) =>
             `Required argument "${name}" (line ${line}) appears after Optional arguments. ` +
             `All Required arguments must precede Optional ones.`,
-        modifierMismatch: (name: unknown, expected: unknown, actual: unknown, line: unknown) =>
-            `Argument "${name}" (line ${line}): modifier should be "${expected}" but is "${actual}".`,
         missingTag: (name: unknown, tag: unknown, line: unknown) =>
             `Argument "${name}" (line ${line}): missing expected tag "${tag}".`,
         extraTag: (name: unknown, tag: unknown, line: unknown) =>
@@ -50,23 +49,23 @@ export class ArgumentSectionSemanticRule extends Rule {
         }
 
         const view = parentCtx.get<SchemaSemanticView>(CTX_SCHEMA_SEMANTIC_VIEW);
-        const doc = parentCtx.get<DocStructure>(CTX_DOC_STRUCTURE);
-        if (!view || !doc) {
-            return [RuleCheckResult.pass("Schema view or doc structure unavailable, rule skipped")];
+        const docView = parentCtx.get<DocSemanticView>(CTX_DOC_SEMANTIC_VIEW);
+        if (!view || !docView) {
+            return [RuleCheckResult.pass("Schema view or doc semantic view unavailable, rule skipped")];
         }
 
         if (view.arguments.size === 0) {
             return [RuleCheckResult.pass("No schema arguments, argument semantic check skipped")];
         }
 
-        const docArgs = doc.arguments;
+        const docArgs = docView.argumentLists.flatMap((list) => list.arguments);
         if (docArgs.length === 0) {
             return [RuleCheckResult.pass("No doc arguments found, existence checked by SectionExistenceRule")];
         }
 
         const failures: RuleCheckResult[] = [];
 
-        this.checkOrdering(docArgs, failures);
+        this.checkOrdering(docArgs, view, failures);
         this.checkTagAlignment(docArgs, view, failures);
         this.checkDescriptionAlignment(docArgs, view, failures);
         this.checkCompleteness(docArgs, view, failures);
@@ -86,44 +85,50 @@ export class ArgumentSectionSemanticRule extends Rule {
         ];
     }
 
-    private checkOrdering(docArgs: DocArgument[], failures: RuleCheckResult[]): void {
+    private checkOrdering(
+        docArgs: Argument[],
+        view: SchemaSemanticView,
+        failures: RuleCheckResult[],
+    ): void {
         if (docArgs.length === 0) return;
 
         const regionIndex = docArgs.findIndex((a) => a.name === "region");
         if (regionIndex > 0) {
+            const line = getStartLine(docArgs[regionIndex]);
             failures.push(
                 this.fail(
                     "regionNotFirst",
                     "",
                     undefined,
-                    RuleCheckResult.fromLine(docArgs[regionIndex].startLine),
-                    docArgs[regionIndex].startLine,
+                    RuleCheckResult.fromLine(line),
+                    line,
                 ),
             );
         }
 
-        let lastRequiredIndex = -1;
         let firstOptionalIndex = -1;
 
         for (let i = 0; i < docArgs.length; i++) {
             const arg = docArgs[i];
             if (arg.name === "region") continue;
+            const field = view.arguments.get(arg.name);
+            if (!field) continue;
 
-            if (arg.modifier === "Required") {
-                lastRequiredIndex = i;
+            if (field.required) {
                 if (firstOptionalIndex >= 0) {
+                    const line = getStartLine(arg);
                     failures.push(
                         this.fail(
                             "orderViolation",
                             "",
                             undefined,
-                            RuleCheckResult.fromLine(arg.startLine),
+                            RuleCheckResult.fromLine(line),
                             arg.name,
-                            arg.startLine,
+                            line,
                         ),
                     );
                 }
-            } else if (arg.modifier === "Optional") {
+            } else if (field.optional) {
                 if (firstOptionalIndex < 0) {
                     firstOptionalIndex = i;
                 }
@@ -132,7 +137,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkTagAlignment(
-        docArgs: DocArgument[],
+        docArgs: Argument[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -140,34 +145,19 @@ export class ArgumentSectionSemanticRule extends Rule {
             const field = view.arguments.get(arg.name);
             if (!field) continue;
 
-            const expectedModifier = field.required ? "Required" : "Optional";
-            if (arg.modifier !== expectedModifier) {
-                failures.push(
-                    this.fail(
-                        "modifierMismatch",
-                        "",
-                        undefined,
-                        RuleCheckResult.fromLine(arg.startLine),
-                        arg.name,
-                        expectedModifier,
-                        arg.modifier,
-                        arg.startLine,
-                    ),
-                );
-            }
-
             const docTagSet = new Set(arg.tags);
             for (const [tag, predicate] of Object.entries(TAG_SCHEMA_MAP)) {
+                const line = getStartLine(arg);
                 if (predicate(field) && !docTagSet.has(tag)) {
                     failures.push(
                         this.fail(
                             "missingTag",
                             "",
                             undefined,
-                            RuleCheckResult.fromLine(arg.startLine),
+                            RuleCheckResult.fromLine(line),
                             arg.name,
                             tag,
-                            arg.startLine,
+                            line,
                         ),
                     );
                 }
@@ -177,10 +167,10 @@ export class ArgumentSectionSemanticRule extends Rule {
                             "extraTag",
                             "",
                             undefined,
-                            RuleCheckResult.fromLine(arg.startLine),
+                            RuleCheckResult.fromLine(line),
                             arg.name,
                             tag,
-                            arg.startLine,
+                            line,
                         ),
                     );
                 }
@@ -189,7 +179,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkDescriptionAlignment(
-        docArgs: DocArgument[],
+        docArgs: Argument[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -198,22 +188,23 @@ export class ArgumentSectionSemanticRule extends Rule {
             if (!field || !field.description) continue;
 
             const expectedPrefix = lowercaseFirst(field.description);
-            const docDesc = arg.descriptionText;
+            const docDesc = arg.description;
             if (!docDesc.startsWith(expectedPrefix)) {
                 const previewLen = expectedPrefix.length + 20;
                 const actualPreview = docDesc.length > previewLen
                     ? docDesc.slice(0, previewLen) + "..."
                     : docDesc;
+                const line = getStartLine(arg);
                 failures.push(
                     this.fail(
                         "descriptionMismatch",
                         "",
                         undefined,
-                        RuleCheckResult.fromLine(arg.startLine),
+                        RuleCheckResult.fromLine(line),
                         arg.name,
                         "Specifies " + expectedPrefix,
                         "Specifies " + actualPreview,
-                        arg.startLine,
+                        line,
                     ),
                 );
             }
@@ -221,7 +212,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkCompleteness(
-        docArgs: DocArgument[],
+        docArgs: Argument[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -237,14 +228,15 @@ export class ArgumentSectionSemanticRule extends Rule {
 
         for (const arg of docArgs) {
             if (!view.arguments.has(arg.name)) {
+                const line = getStartLine(arg);
                 failures.push(
                     this.fail(
                         "extraInDoc",
                         "",
                         undefined,
-                        RuleCheckResult.fromLine(arg.startLine),
+                        RuleCheckResult.fromLine(line),
                         arg.name,
-                        arg.startLine,
+                        line,
                     ),
                 );
             }
@@ -255,4 +247,8 @@ export class ArgumentSectionSemanticRule extends Rule {
 function lowercaseFirst(s: string): string {
     if (s.length === 0) return s;
     return s[0].toLowerCase() + s.slice(1);
+}
+
+function getStartLine(arg: Argument): number | undefined {
+    return arg.sourceRange?.start.line;
 }

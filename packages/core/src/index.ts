@@ -32,8 +32,8 @@ export {
 } from "./workflow/implement/resource-doc/rules";
 export {
     ResourceCheckWorkflow,
-    buildSchemaSemanticView,
 } from "./workflow/implement/resource-check/resource-check-workflow";
+export { buildSchemaSemanticView } from "./workflow/implement/resource-check/tools/schema-semantic";
 export {
     MARKDOWN_FORMAT_RULES,
     FrontmatterCheckRule,
@@ -49,14 +49,16 @@ export {
 export type {
     ResourceCheckInput,
     ResourceType,
-    DocStructure,
-    DocArgument,
-    DocAttribute,
+    Argument,
+    Attribute,
+    ArgumentList,
+    AttributeList,
     SchemaSemanticView,
     SemanticField,
     TimeoutView,
     ImportView,
 } from "./workflow/implement/resource-check/types";
+export { DocSemanticView } from "./workflow/implement/resource-check/types";
 export { parseResourceCheckInput, resolveResourcePaths } from "./workflow/implement/resource-check/types";
 
 // ── Description Format Spec ──
@@ -99,14 +101,19 @@ export { Context } from "./workflow/context/context";
 
 // ── AST Parsers ──
 export { MarkdownParser } from "./tools/ast-parser/markdown";
+export { GoParser } from "./tools/ast-parser/go";
+export type { SyntaxNode, Tree, QueryMatch, QueryCapture } from "./tools/ast-parser/go";
+
+// ── Terraform Schema ──
 export {
-    GoParser,
     TerraformSchemaExtractor,
     TerraformSchemaSemanticNormalizer,
-} from "./tools/ast-parser/go";
+} from "./workflow/implement/resource-check/tools/terraform-schema";
 export type {
     ForceNewSemantics,
+    ImportIdSemantics,
     ImportableSemantics,
+    NonUpdatableSemantics,
     ResourceSemantics,
     SchemaField,
     SchemaFieldType,
@@ -116,7 +123,7 @@ export type {
     ResourceTimeoutSemantics,
     ResourceTimeouts,
     TimeoutSemanticValue,
-} from "./tools/ast-parser/go";
+} from "./workflow/implement/resource-check/tools/terraform-schema";
 
 // ── Text Search ──
 export { RegexGrep } from "./tools/text-grep";

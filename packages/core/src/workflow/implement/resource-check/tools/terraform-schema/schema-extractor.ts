@@ -1,5 +1,5 @@
-import { GoParser } from "./parser";
-import type { SyntaxNode } from "./parser";
+import { GoParser } from "../../../../../tools/ast-parser/go";
+import type { SyntaxNode } from "../../../../../tools/ast-parser/go";
 import type {
     ResourceOptions,
     ResourceSchema,
@@ -479,7 +479,7 @@ export class TerraformSchemaExtractor {
         if (text.startsWith('"') && text.endsWith('"')) {
             return text.slice(1, -1);
         }
-        if (text.startsWith('`') && text.endsWith('`')) {
+        if (text.startsWith("`") && text.endsWith("`")) {
             return text.slice(1, -1);
         }
         return null;
