@@ -7,6 +7,7 @@ logs/
 
 .vscode/
 .cursor/
+design/
 
 # Old web directory (locked native binaries, safe to delete manually)
 /web/

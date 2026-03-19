@@ -1,6 +1,6 @@
-import type { MarkdownNode, MarkdownNodeType } from "../../../../../tools/ast-parser/markdown";
-import { Rule, RuleCheckResult, type RuleMeta } from "../../../../types/rule/rule";
-import type { Context } from "../../../../context/context";
+import type { MarkdownNode, MarkdownNodeType } from "../../../../../../tools/ast-parser/markdown";
+import { Rule, RuleCheckResult, type RuleMeta } from "../../../../../types/rule/rule";
+import type { Context } from "../../../../../context/context";
 
 const META: RuleMeta = {
     name: "md-blank-line-between-blocks",

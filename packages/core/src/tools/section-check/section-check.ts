@@ -19,10 +19,20 @@ type Step =
           expected: string;
           normalize?: (s: string) => string;
       }
-    | { kind: "eachBulletItem"; check: (firstLine: BulletLine) => boolean }
+    | {
+          kind: "requireBulletList";
+          includeNestedLists: boolean;
+          message?: string;
+      }
+    | {
+          kind: "eachBulletItem";
+          check: (firstLine: BulletLine) => boolean;
+          includeNestedLists: boolean;
+      }
     | {
           kind: "eachBulletItemAsync";
           check: (item: BulletItem) => Promise<CheckFailure | null>;
+          includeNestedLists: boolean;
       }
     | {
           kind: "validate";
@@ -64,15 +74,39 @@ export class SectionCheck {
         return this;
     }
 
-    public eachBulletItem(check: (firstLine: BulletLine) => boolean): this {
-        this.steps.push({ kind: "eachBulletItem", check });
+    public eachBulletItem(
+        check: (firstLine: BulletLine) => boolean,
+        options?: { includeNestedLists?: boolean }
+    ): this {
+        this.steps.push({
+            kind: "eachBulletItem",
+            check,
+            includeNestedLists: options?.includeNestedLists ?? false,
+        });
+        return this;
+    }
+
+    public requireBulletList(options?: {
+        includeNestedLists?: boolean;
+        message?: string;
+    }): this {
+        this.steps.push({
+            kind: "requireBulletList",
+            includeNestedLists: options?.includeNestedLists ?? false,
+            message: options?.message,
+        });
         return this;
     }
 
     public eachBulletItemAsync(
-        check: (item: BulletItem) => Promise<CheckFailure | null>
+        check: (item: BulletItem) => Promise<CheckFailure | null>,
+        options?: { includeNestedLists?: boolean }
     ): this {
-        this.steps.push({ kind: "eachBulletItemAsync", check });
+        this.steps.push({
+            kind: "eachBulletItemAsync",
+            check,
+            includeNestedLists: options?.includeNestedLists ?? false,
+        });
         return this;
     }
 
@@ -148,7 +182,8 @@ export class SectionCheck {
             if (step.kind === "eachBulletItem") {
                 const bulletItems = this.resolveBulletItems(
                     extracted.nodes,
-                    structureMatch?.tagged["bullets"] ?? []
+                    structureMatch?.tagged["bullets"] ?? [],
+                    step.includeNestedLists
                 );
                 for (const item of bulletItems) {
                     const bullet = this.parser.getItemBulletLine(code, item);
@@ -170,10 +205,30 @@ export class SectionCheck {
                 continue;
             }
 
+            if (step.kind === "requireBulletList") {
+                const listNodes = this.resolveListNodes(
+                    structureMatch?.tagged["bullets"]?.length
+                        ? structureMatch.tagged["bullets"]
+                        : extracted.nodes,
+                    step.includeNestedLists
+                );
+                if (listNodes.length === 0) {
+                    failures.push({
+                        message:
+                            step.message ??
+                            `${this.targetDisplay()} exists but does not contain a bullet list.`,
+                        line: extracted.startLine,
+                    });
+                    return failures;
+                }
+                continue;
+            }
+
             if (step.kind === "eachBulletItemAsync") {
                 const bulletItems = this.resolveBulletItems(
                     extracted.nodes,
-                    structureMatch?.tagged["bullets"] ?? []
+                    structureMatch?.tagged["bullets"] ?? [],
+                    step.includeNestedLists
                 );
                 for (const node of bulletItems) {
                     const item = this.buildBulletItem(code, node);
@@ -258,12 +313,42 @@ export class SectionCheck {
 
     private resolveBulletItems(
         sectionNodes: MarkdownNode[],
-        taggedBullets: MarkdownNode[]
+        taggedBullets: MarkdownNode[],
+        includeNestedLists: boolean
     ): MarkdownNode[] {
-        const listNodes = taggedBullets.length > 0
-            ? taggedBullets
-            : sectionNodes.filter((n) => n.type === "list");
+        const listNodes = this.resolveListNodes(
+            taggedBullets.length > 0 ? taggedBullets : sectionNodes,
+            includeNestedLists
+        );
         return this.parser.getBulletItems(listNodes);
+    }
+
+    private resolveListNodes(
+        nodes: MarkdownNode[],
+        includeNestedLists: boolean
+    ): MarkdownNode[] {
+        if (!includeNestedLists) {
+            return nodes.filter((n) => n.type === "list");
+        }
+
+        const listNodes: MarkdownNode[] = [];
+        const seen = new Set<MarkdownNode>();
+
+        const walk = (node: MarkdownNode): void => {
+            if (node.type === "list" && !seen.has(node)) {
+                seen.add(node);
+                listNodes.push(node);
+            }
+            for (const child of node.children) {
+                walk(child);
+            }
+        };
+
+        for (const node of nodes) {
+            walk(node);
+        }
+
+        return listNodes;
     }
 
     private buildBulletItem(code: string, node: MarkdownNode): BulletItem | null {

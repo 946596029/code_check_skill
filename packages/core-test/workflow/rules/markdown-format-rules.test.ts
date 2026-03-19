@@ -6,6 +6,8 @@ import {
     BlankLineBetweenBlocksRule,
     H1ExistsRule,
     ExampleSectionExistsRule,
+    ArgumentSectionFormatRule,
+    AttributeSectionFormatRule,
 } from "../../../core/src/workflow/implement/resource-check/rules";
 import { MarkdownParser } from "../../../core/src/tools/ast-parser/markdown";
 
@@ -127,6 +129,176 @@ describe("ExampleSectionExistsRule", () => {
         expect(results).toHaveLength(1);
         expect(results[0].success).toBe(false);
         expect(results[0].message).toContain("Example Usage");
+    });
+});
+
+// ─── ArgumentSectionFormatRule ───────────────────────────────
+
+describe("ArgumentSectionFormatRule", () => {
+    const rule = new ArgumentSectionFormatRule();
+
+    it("should pass when Argument Reference section is missing", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Example Usage",
+            "",
+            "```hcl",
+            "resource \"test\" {}",
+            "```",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should fail when Argument Reference section has no list", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Argument Reference",
+            "",
+            "The following arguments are supported:",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(false);
+        expect(results[0].message).toContain("bullet list");
+    });
+
+    it("should pass when all argument bullets are valid", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Argument Reference",
+            "",
+            "* `name` - (Required, String) Name of the resource.",
+            "* `members` - (Optional, List) Members list.",
+            "",
+            "The `members` block supports:",
+            "",
+            "* `id` - (Required, String) Member identifier.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should fail when an argument bullet format is invalid", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Argument Reference",
+            "",
+            "* `name` - Name of the resource.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(false);
+        expect(results[0].children.length).toBeGreaterThan(0);
+    });
+
+    it("should fail when a nested argument bullet format is invalid", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Argument Reference",
+            "",
+            "* `members` - (Optional, List) Members list.",
+            "  * `id` - Member identifier.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(false);
+        expect(results[0].children.length).toBeGreaterThan(0);
+    });
+});
+
+// ─── AttributeSectionFormatRule ──────────────────────────────
+
+describe("AttributeSectionFormatRule", () => {
+    const rule = new AttributeSectionFormatRule();
+
+    it("should pass when Attributes Reference section is missing", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Example Usage",
+            "",
+            "```hcl",
+            "resource \"test\" {}",
+            "```",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should fail when Attributes Reference section has no list", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Attributes Reference",
+            "",
+            "In addition to all arguments above, the following attributes are exported:",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(false);
+        expect(results[0].message).toContain("bullet list");
+    });
+
+    it("should pass when all attribute bullets are valid", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Attribute Reference",
+            "",
+            "* `id` - The resource id.",
+            "* `status` - Current status.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should fail when an attribute bullet format is invalid", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Attributes Reference",
+            "",
+            "* id - The resource id.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(false);
+        expect(results[0].children.length).toBeGreaterThan(0);
+    });
+
+    it("should fail when a nested attribute bullet format is invalid", async () => {
+        const md = [
+            "# Resource",
+            "",
+            "## Attributes Reference",
+            "",
+            "* `user` - User attributes.",
+            "  * id - The resource id.",
+        ].join("\n");
+
+        const results = await check(rule, md);
+        expect(results).toHaveLength(1);
+        expect(results[0].success).toBe(false);
+        expect(results[0].children.length).toBeGreaterThan(0);
     });
 });
 

@@ -1,7 +1,7 @@
-import type { MarkdownNode, SourceRange } from "../../../../../tools/ast-parser/markdown";
-import { MarkdownParser } from "../../../../../tools/ast-parser/markdown";
-import { Rule, RuleCheckResult, type RuleMeta } from "../../../../types/rule/rule";
-import type { Context } from "../../../../context/context";
+import type { MarkdownNode, SourceRange } from "../../../../../../tools/ast-parser/markdown";
+import { MarkdownParser } from "../../../../../../tools/ast-parser/markdown";
+import { Rule, RuleCheckResult, type RuleMeta } from "../../../../../types/rule/rule";
+import type { Context } from "../../../../../context/context";
 
 const MAX_LINE_LENGTH = 120;
 

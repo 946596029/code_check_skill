@@ -34,7 +34,7 @@ const MODIFIERS = ["Required", "Optional"];
 const TYPES = ["String", "Int", "Bool", "List", "Map", "Float", "Set"];
 const TAGS = ["ForceNew", "NonUpdatable", "Deprecated", "Computed", "Sensitive"];
 
-const ARG_BULLET_PATTERN = new LinePattern([
+export const ARG_BULLET_PATTERN = new LinePattern([
     literal("* "),
     backticked("arg_name"),
     spaces(1),
@@ -49,7 +49,7 @@ const ARG_BULLET_PATTERN = new LinePattern([
     rest("description"),
 ]);
 
-const ATTR_BULLET_PATTERN = new LinePattern([
+export const ATTR_BULLET_PATTERN = new LinePattern([
     literal("* "),
     backticked("attr_name"),
     spaces(1),

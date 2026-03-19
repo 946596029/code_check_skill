@@ -9,6 +9,8 @@ export {
     BlankLineBetweenBlocksRule,
     H1ExistsRule,
     ExampleSectionExistsRule,
+    ArgumentSectionFormatRule,
+    AttributeSectionFormatRule,
 } from "./markdown-format";
 
 export {
