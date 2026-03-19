@@ -1,15 +1,18 @@
-import type { MarkdownNode } from "../../../../../tools/ast-parser/markdown";
-import { MarkdownParser } from "../../../../../tools/ast-parser/markdown";
-import { Rule, RuleCheckResult, type RuleMeta } from "../../../../types/rule/rule";
-import type { Context } from "../../../../context/context";
-import type { SchemaSemanticView } from "../../types";
-import { CTX_SCHEMA_SEMANTIC_VIEW } from "../../context-keys";
+import type { MarkdownNode } from "../../../../../../tools/ast-parser/markdown";
+import { MarkdownParser } from "../../../../../../tools/ast-parser/markdown";
+import { Rule, RuleCheckResult, type RuleMeta } from "../../../../../types/rule/rule";
+import type { Context } from "../../../../../context/context";
+import type { SchemaSemanticView } from "../../../types";
+import type { DocSemanticView } from "../../../tools/doc-semantic";
+import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../../context-keys";
 
 interface SectionExpectation {
     title: string;
     level: number;
     shouldExist: (view: SchemaSemanticView) => boolean;
     reason: (view: SchemaSemanticView) => string;
+    schemaFields?: (view: SchemaSemanticView) => string[];
+    docFields?: (docView: DocSemanticView) => string[];
     introLine?: string;
 }
 
@@ -19,6 +22,8 @@ const SECTION_EXPECTATIONS: SectionExpectation[] = [
         level: 2,
         shouldExist: (v) => v.arguments.size > 0,
         reason: (v) => `schema has ${v.arguments.size} argument(s)`,
+        schemaFields: (v) => [...v.arguments.keys()],
+        docFields: (d) => d.argumentLists.flatMap((l) => l.arguments.map((a) => a.name)),
         introLine: "The following arguments are supported:",
     },
     {
@@ -26,6 +31,8 @@ const SECTION_EXPECTATIONS: SectionExpectation[] = [
         level: 2,
         shouldExist: (v) => v.attributes.size > 0,
         reason: (v) => `schema has ${v.attributes.size} attribute(s)`,
+        schemaFields: (v) => [...v.attributes.keys()],
+        docFields: (d) => d.attributeLists.flatMap((l) => l.attributes.map((a) => a.name)),
         introLine: "In addition to all arguments above, the following attributes are exported:",
     },
     {
@@ -47,10 +54,12 @@ const META: RuleMeta = {
     description:
         "Markdown sections must exist if and only if the schema has corresponding data",
     messages: {
-        missing: (title: unknown, reason: unknown) =>
-            `Section "## ${title}" is missing but expected: ${reason}.`,
-        unexpected: (title: unknown) =>
-            `Section "## ${title}" exists but has no corresponding schema data.`,
+        missing: (title: unknown, reason: unknown, fields: unknown) =>
+            `Section "## ${title}" is missing but expected: ${reason}.` +
+            (fields ? ` Schema fields: [${fields}]` : ""),
+        unexpected: (title: unknown, fields: unknown) =>
+            `Section "## ${title}" exists but has no corresponding schema data.` +
+            (fields ? ` Doc fields to remove: [${fields}]` : ""),
         introMismatch: (title: unknown, expected: unknown, actual: unknown) =>
             `Section "## ${title}" intro line should be "${expected}" but found "${actual}".`,
         introMissing: (title: unknown, expected: unknown) =>
@@ -79,6 +88,7 @@ export class SectionExistenceRule extends Rule {
             return [RuleCheckResult.pass("Schema semantic view unavailable, rule skipped")];
         }
 
+        const docView = parentCtx.get<DocSemanticView>(CTX_DOC_SEMANTIC_VIEW);
         const doc = ast as MarkdownNode;
         const results: RuleCheckResult[] = [];
 
@@ -88,6 +98,9 @@ export class SectionExistenceRule extends Rule {
             const expected = expectation.shouldExist(view);
 
             if (expected && !exists) {
+                const schemaFieldList = expectation.schemaFields
+                    ? expectation.schemaFields(view).join(", ")
+                    : "";
                 results.push(
                     this.fail(
                         "missing",
@@ -96,10 +109,14 @@ export class SectionExistenceRule extends Rule {
                         undefined,
                         expectation.title,
                         expectation.reason(view),
+                        schemaFieldList,
                     ),
                 );
             } else if (!expected && exists) {
                 const startLine = section?.[0]?.sourceRange?.start.line;
+                const docFieldList = (expectation.docFields && docView)
+                    ? expectation.docFields(docView).join(", ")
+                    : "";
                 results.push(
                     this.fail(
                         "unexpected",
@@ -107,6 +124,7 @@ export class SectionExistenceRule extends Rule {
                         undefined,
                         RuleCheckResult.fromLine(startLine),
                         expectation.title,
+                        docFieldList,
                     ),
                 );
             } else if (expected && exists && expectation.introLine) {

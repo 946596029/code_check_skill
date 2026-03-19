@@ -241,11 +241,16 @@ func resourceUnknownDiff() *schema.Resource {
             expect(normalized.resourceSemantics?.forceNew?.fields).toEqual(["region"]);
         });
 
-        it("should not derive nonUpdatable when FlexibleNonUpdatable is absent", () => {
+        it("should derive nonUpdatable from FlexibleForceNew when FlexibleNonUpdatable is absent", () => {
             const schemas = extractor.extract(SEMANTIC_SOURCE);
             const [normalized] = normalizer.normalizeSchemas(SEMANTIC_SOURCE, schemas);
 
-            expect(normalized.resourceSemantics?.nonUpdatable).toBeUndefined();
+            expect(normalized.resourceSemantics?.nonUpdatable?.fields).toEqual([
+                "instance_id",
+                "vpc_channel_id",
+            ]);
+            expect(normalized.resourceSemantics?.nonUpdatable?.confidence).toBe("high");
+            expect(normalized.resourceSemantics?.nonUpdatable?.source).toBe("customizeDiff");
         });
 
         it("should derive nonUpdatable from real provider resource with variable reference", () => {
@@ -260,8 +265,13 @@ func resourceUnknownDiff() *schema.Resource {
                 "instance_id",
                 "vpc_channel_id",
             ]);
-            // This resource uses FlexibleForceNew only, so nonUpdatable should be undefined
-            expect(normalized.resourceSemantics?.nonUpdatable).toBeUndefined();
+            // This resource uses FlexibleForceNew only, which should also imply nonUpdatable.
+            expect(normalized.resourceSemantics?.nonUpdatable?.fields).toEqual([
+                "instance_id",
+                "vpc_channel_id",
+            ]);
+            expect(normalized.resourceSemantics?.nonUpdatable?.confidence).toBe("high");
+            expect(normalized.resourceSemantics?.nonUpdatable?.source).toBe("customizeDiff");
         });
     });
 

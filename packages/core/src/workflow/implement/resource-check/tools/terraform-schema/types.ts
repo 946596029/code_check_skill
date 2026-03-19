@@ -44,6 +44,9 @@ export interface SchemaField {
 
     /** Nested sub-fields when Elem is a *schema.Resource (block-level nesting) */
     subFields?: SchemaField[];
+
+    /** Whether the field is marked as internal via utils.SchemaDesc */
+    internal?: boolean;
 }
 
 /**

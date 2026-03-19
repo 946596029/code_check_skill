@@ -273,6 +273,9 @@ export class TerraformSchemaExtractor {
                     break;
                 case "Description":
                     field.description = this.extractStringLiteral(propVal) ?? "";
+                    if (this.isInternalDescription(propVal)) {
+                        field.internal = true;
+                    }
                     break;
                 case "Default":
                     field.defaultValue = propVal.text;
@@ -468,6 +471,15 @@ export class TerraformSchemaExtractor {
 
         if (Object.keys(timeouts).length === 0) return undefined;
         return timeouts;
+    }
+
+    /**
+     * Detect `utils.SchemaDesc("...", utils.SchemaDescInput{Internal: true})`
+     * pattern in the Description value node.
+     */
+    private isInternalDescription(node: SyntaxNode): boolean {
+        const text = node.text;
+        return /utils\.SchemaDesc\b/.test(text) && /Internal:\s*true/.test(text);
     }
 
     /**

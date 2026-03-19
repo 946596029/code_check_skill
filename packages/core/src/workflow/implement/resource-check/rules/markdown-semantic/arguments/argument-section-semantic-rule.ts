@@ -1,8 +1,8 @@
-import { Rule, RuleCheckResult, type RuleMeta } from "../../../../types/rule/rule";
-import type { Context } from "../../../../context/context";
-import type { SchemaSemanticView, SemanticField } from "../../types";
-import type { Argument, DocSemanticView } from "../../tools/doc-semantic";
-import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../context-keys";
+import { Rule, RuleCheckResult, type RuleMeta } from "../../../../../types/rule/rule";
+import type { Context } from "../../../../../context/context";
+import type { SchemaSemanticView, SemanticField } from "../../../types";
+import type { Argument, DocSemanticView } from "../../../tools/doc-semantic";
+import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../../context-keys";
 
 const META: RuleMeta = {
     name: "argument-section-semantic",
@@ -30,7 +30,7 @@ const META: RuleMeta = {
 };
 
 const TAG_SCHEMA_MAP: Record<string, (f: SemanticField) => boolean> = {
-    ForceNew: (f) => f.forceNew,
+    ForceNew: (f) => f.forceNew && !f.nonUpdatable,
     NonUpdatable: (f) => f.nonUpdatable,
 };
 
@@ -187,7 +187,7 @@ export class ArgumentSectionSemanticRule extends Rule {
             const field = view.arguments.get(arg.name);
             if (!field || !field.description) continue;
 
-            const expectedPrefix = lowercaseFirst(field.description);
+            const expectedPrefix = "Specifies " + lowercaseFirst(field.description);
             const docDesc = arg.description;
             if (!docDesc.startsWith(expectedPrefix)) {
                 const previewLen = expectedPrefix.length + 20;
@@ -202,8 +202,8 @@ export class ArgumentSectionSemanticRule extends Rule {
                         undefined,
                         RuleCheckResult.fromLine(line),
                         arg.name,
-                        "Specifies " + expectedPrefix,
-                        "Specifies " + actualPreview,
+                        expectedPrefix,
+                        actualPreview,
                         line,
                     ),
                 );

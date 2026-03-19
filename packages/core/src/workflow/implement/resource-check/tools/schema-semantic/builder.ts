@@ -33,6 +33,8 @@ function classifyField(
     args: Map<string, SemanticField>,
     attrs: Map<string, SemanticField>,
 ): void {
+    if (field.internal) return;
+
     const semantic = toSemanticField(field, forceNewSet, nonUpdatableSet);
     if (field.required || field.optional) {
         args.set(field.name, semantic);

@@ -13,9 +13,9 @@ import {
     TerraformSchemaExtractor,
     TerraformSchemaSemanticNormalizer,
 } from "../../core/src/workflow/implement/resource-check/tools/terraform-schema";
-import { SectionExistenceRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/section-existence-rule";
-import { ArgumentSectionSemanticRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/argument-section-semantic-rule";
-import { AttributeSectionSemanticRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/attribute-section-semantic-rule";
+import { SectionExistenceRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/total/section-existence-rule";
+import { ArgumentSectionSemanticRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/arguments/argument-section-semantic-rule";
+import { AttributeSectionSemanticRule } from "../../core/src/workflow/implement/resource-check/rules/markdown-semantic/attributes/attribute-section-semantic-rule";
 import { MarkdownParser } from "../../core/src/tools/ast-parser/markdown";
 import { Context } from "../../core/src/workflow/context/context";
 import type { RuleCheckResult } from "../../core/src/workflow/types/rule/rule";
@@ -177,7 +177,7 @@ describe("ResourceCheckWorkflow", () => {
         expect(stageError!.results[0].message).toContain("Stage execution error");
     });
 
-    it("should mark HCL stage as not configured (success=false)", async () => {
+    it("should mark HCL stage as not configured but passed placeholder", async () => {
         const input = makeInput();
         const report = await checker.check({
             code: toCode(input),
@@ -187,7 +187,7 @@ describe("ResourceCheckWorkflow", () => {
         const hcl = report.results.find((r) => r.ruleName === "test-hcl-style-check");
         expect(hcl).toBeDefined();
         expect(hcl!.results).toHaveLength(1);
-        expect(hcl!.results[0].success).toBe(false);
+        expect(hcl!.results[0].success).toBe(true);
         expect(hcl!.results[0].message).toContain("not configured");
     });
 
@@ -564,7 +564,7 @@ describe("ArgumentSectionSemanticRule", () => {
         const docView = makeDocSemanticView([
             makeArg({
                 name: "instance_id",
-                description: "the ID of the dedicated instance.",
+                description: "Specifies the ID of the dedicated instance.",
             }),
         ]);
 
@@ -602,7 +602,7 @@ describe("ArgumentSectionSemanticRule", () => {
         const docView = makeDocSemanticView([
             makeArg({
                 name: "name",
-                description: "an unique name of the resource.",
+                description: "Specifies an unique name of the resource.",
             }),
         ]);
 

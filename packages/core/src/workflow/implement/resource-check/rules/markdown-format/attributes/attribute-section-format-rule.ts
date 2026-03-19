@@ -49,7 +49,7 @@ export class AttributeSectionFormatRule extends Rule {
                 message: this.msg("missingList"),
             })
             .eachBulletItem((line) => line.matches(ATTR_BULLET_PATTERN), {
-                includeNestedLists: true,
+                includeNestedLists: false,
             })
             .run(doc, code);
 

@@ -1,8 +1,8 @@
-import { Rule, RuleCheckResult, type RuleMeta } from "../../../../types/rule/rule";
-import type { Context } from "../../../../context/context";
-import type { SchemaSemanticView } from "../../types";
-import type { Attribute, DocSemanticView } from "../../tools/doc-semantic";
-import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../context-keys";
+import { Rule, RuleCheckResult, type RuleMeta } from "../../../../../types/rule/rule";
+import type { Context } from "../../../../../context/context";
+import type { SchemaSemanticView } from "../../../types";
+import type { Attribute, DocSemanticView } from "../../../tools/doc-semantic";
+import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../../context-keys";
 
 const META: RuleMeta = {
     name: "attribute-section-semantic",

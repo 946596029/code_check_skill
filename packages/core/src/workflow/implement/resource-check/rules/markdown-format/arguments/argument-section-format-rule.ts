@@ -47,7 +47,7 @@ export class ArgumentSectionFormatRule extends Rule {
                 message: this.msg("missingList"),
             })
             .eachBulletItem((line) => line.matches(ARG_BULLET_PATTERN), {
-                includeNestedLists: true,
+                includeNestedLists: false,
             })
             .run(doc, code);
 

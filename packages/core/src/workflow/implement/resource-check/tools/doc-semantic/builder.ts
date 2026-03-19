@@ -405,11 +405,19 @@ function parseArgumentItemsFromList(
             continue;
         }
 
+        const fullDescription = getLogicalLineDescription(
+            parser,
+            source,
+            item,
+            "argument",
+            parsed.description,
+        );
+
         result.push({
             name: parsed.name,
             tags: parsed.tags,
-            description: parsed.description,
-            details: buildItemDetailsTree(parser, source, item, parsed.description),
+            description: fullDescription,
+            details: buildItemDetailsTree(parser, source, item, fullDescription),
             arguments: [],
             sourceRange: item.sourceRange ?? undefined,
         });
@@ -442,10 +450,18 @@ function parseAttributeItemsFromList(
             continue;
         }
 
+        const fullDescription = getLogicalLineDescription(
+            parser,
+            source,
+            item,
+            "attribute",
+            parsed.description,
+        );
+
         result.push({
             name: parsed.name,
-            description: parsed.description,
-            details: buildItemDetailsTree(parser, source, item, parsed.description),
+            description: fullDescription,
+            details: buildItemDetailsTree(parser, source, item, fullDescription),
             attributes: [],
             sourceRange: item.sourceRange ?? undefined,
         });
@@ -488,6 +504,28 @@ function parseAttributeBullet(
 
 function stripBackticks(s: string): string {
     return s.replace(/`/g, "").trim();
+}
+
+function getLogicalLineDescription(
+    parser: MarkdownParser,
+    source: string,
+    item: MarkdownNode,
+    kind: "argument" | "attribute",
+    fallback: string,
+): string {
+    const logical = parser.getLogicalLines(source, item);
+    const firstLogicalLine = logical?.lines[0];
+    if (!firstLogicalLine) return fallback;
+
+    const normalizedLine = firstLogicalLine.trim();
+    const bulletText = normalizedLine.startsWith("* ")
+        ? normalizedLine
+        : `* ${normalizedLine}`;
+
+    if (kind === "argument") {
+        return parseArgumentBullet(bulletText)?.description ?? fallback;
+    }
+    return parseAttributeBullet(bulletText)?.description ?? fallback;
 }
 
 function extractSectionDescription(

@@ -55,6 +55,13 @@ export class TerraformSchemaSemanticNormalizer {
             );
             if (nonUpdatable) {
                 semantics.nonUpdatable = nonUpdatable;
+            } else if (forceNew) {
+                // In provider practice, FlexibleForceNew implies fields are non-updatable.
+                semantics.nonUpdatable = {
+                    fields: forceNew.fields,
+                    confidence: "high",
+                    source: "customizeDiff",
+                };
             }
         }
 
