@@ -17,6 +17,8 @@ export function buildSchemaSemanticView(schema: ResourceSchema): SchemaSemanticV
         classifyField(field, forceNewSet, nonUpdatableSet, args, attrs);
     }
 
+    injectImplicitAttributes(attrs);
+
     return {
         resourceName: schema.resourceName,
         arguments: args,
@@ -66,6 +68,27 @@ function toSemanticField(
     }
 
     return result;
+}
+
+const IMPLICIT_ATTRIBUTES: SemanticField[] = [
+    {
+        name: "id",
+        type: "TypeString",
+        required: false,
+        optional: false,
+        computed: true,
+        forceNew: false,
+        nonUpdatable: false,
+        description: "The resource ID.",
+    },
+];
+
+function injectImplicitAttributes(attrs: Map<string, SemanticField>): void {
+    for (const field of IMPLICIT_ATTRIBUTES) {
+        if (!attrs.has(field.name)) {
+            attrs.set(field.name, field);
+        }
+    }
 }
 
 function buildTimeoutView(schema: ResourceSchema): TimeoutView | null {
