@@ -12,6 +12,7 @@ import {
     parseResourceCheckInput,
     resolveResourcePaths,
 } from "./types";
+import type { ResourceCheckInput } from "./types";
 import { buildSchemaSemanticView } from "./tools/schema-semantic";
 import {
     CTX_DOC_MARKDOWN_AST,
@@ -232,6 +233,7 @@ export class ResourceCheckWorkflow extends Workflow {
             execute: async (runtime) => {
                 const source = runtime.getArtifact<string>(CTX_DOC_MD_SOURCE) ?? "";
                 const schemas = runtime.getArtifact<ResourceSchema[]>(CTX_IMPLEMENT_GO_SCHEMAS) ?? [];
+                const input = runtime.getArtifact<ResourceCheckInput>(CTX_INPUT);
                 const missingDoc = !source.trim();
                 const missingSemantic = schemas.length === 0;
 
@@ -254,7 +256,7 @@ export class ResourceCheckWorkflow extends Workflow {
                     return;
                 }
 
-                const view = buildSchemaSemanticView(schemas[0]);
+                const view = buildSchemaSemanticView(schemas[0], input?.resourceType ?? "resource");
                 runtime.setArtifact(CTX_SCHEMA_SEMANTIC_VIEW, view);
 
                 const ast = runtime.getArtifact<MarkdownNode>(CTX_DOC_MARKDOWN_AST);

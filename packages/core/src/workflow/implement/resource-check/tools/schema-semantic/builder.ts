@@ -6,7 +6,10 @@ import type {
     TimeoutView,
 } from "./types";
 
-export function buildSchemaSemanticView(schema: ResourceSchema): SchemaSemanticView {
+export function buildSchemaSemanticView(
+    schema: ResourceSchema,
+    resourceType: "resource" | "data-source" = "resource"
+): SchemaSemanticView {
     const forceNewSet = new Set(schema.resourceSemantics?.forceNew?.fields ?? []);
     const nonUpdatableSet = new Set(schema.resourceSemantics?.nonUpdatable?.fields ?? []);
 
@@ -17,7 +20,9 @@ export function buildSchemaSemanticView(schema: ResourceSchema): SchemaSemanticV
         classifyField(field, forceNewSet, nonUpdatableSet, args, attrs);
     }
 
-    injectImplicitAttributes(attrs);
+    if (resourceType === "resource") {
+        injectImplicitAttributes(attrs);
+    }
 
     return {
         resourceName: schema.resourceName,
