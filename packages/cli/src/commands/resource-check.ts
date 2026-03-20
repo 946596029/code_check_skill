@@ -1,4 +1,4 @@
-import { CodeChecker } from "@code-check/core";
+import { CodeChecker } from "@greyworld/code-check-core";
 import { printReport } from "../reporter";
 
 export type ResourceCheckInput = {

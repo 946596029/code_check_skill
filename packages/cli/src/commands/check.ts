@@ -1,4 +1,4 @@
-import { CodeChecker } from "@code-check/core";
+import { CodeChecker } from "@greyworld/code-check-core";
 import { resolveResourcePath, type ResourceResolver } from "../resolver/resource-resolver";
 import { printReport } from "../reporter";
 

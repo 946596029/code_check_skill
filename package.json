@@ -3,20 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "pnpm -r build",
-    "build:core": "pnpm --filter @code-check/core build",
-    "build:cli": "pnpm --filter @code-check/cli build",
+    "build": "pnpm install && pnpm -r build",
+    "build:core": "pnpm --filter @greyworld/code-check-core build",
+    "build:cli": "pnpm --filter @greyworld/code-check-cli build",
     "cli": "node packages/cli/dist/index.js",
-    
-    "test:core": "pnpm --filter @code-check/core-test test",
-    "test:llm:connect": "pnpm --filter @code-check/core-test test:llm:connect",
+
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "publish-packages": "changeset publish",
+
+    "test:core": "pnpm --filter @greyworld/code-check-core-test test",
+    "test:llm:connect": "pnpm --filter @greyworld/code-check-core-test test:llm:connect",
     "test:intent:prompt": "npx tsx packages/core-test/scripts/prompt-test/prompt-test.ts",
     "test:provider:schema:print": "npx tsx packages/core-test/scripts/provider-schema-print/print-provider-schema.ts",
     "test:core:run": "npx tsx packages/core-test/scripts/core-test/run-core-check.ts",
-    "test:core:watch": "pnpm --filter @code-check/core-test test:watch"
+    "test:core:watch": "pnpm --filter @greyworld/code-check-core-test test:watch"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "AI-powered code review tool with modular architecture"
+  "description": "AI-powered code review tool with modular architecture",
+  "devDependencies": {
+    "@changesets/cli": "^2.30.0"
+  }
 }

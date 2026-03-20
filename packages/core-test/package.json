@@ -1,5 +1,5 @@
 {
-  "name": "@code-check/core-test",
+  "name": "@greyworld/code-check-core-test",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "test:llm:connect": "cross-env RUN_LLM_CONNECT_TEST=1 NODE_OPTIONS=--max-old-space-size=4096 vitest run scripts/llm_connect/llm-connect.test.ts"
   },
   "dependencies": {
-    "@code-check/core": "workspace:*",
+    "@greyworld/code-check-core": "workspace:*",
     "zod": "^4.3.6"
   },
   "devDependencies": {

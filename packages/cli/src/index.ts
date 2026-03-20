@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import path from "path";
-import { CodeChecker } from "@code-check/core";
+import { CodeChecker } from "@greyworld/code-check-core";
 import { setupChecker } from "./setup";
 import { listWorkflowCommand } from "./commands/list-workflow";
 import { checkCommand } from "./commands/check";

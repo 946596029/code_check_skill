@@ -1,4 +1,4 @@
-import { CodeChecker } from "@code-check/core";
+import { CodeChecker } from "@greyworld/code-check-core";
 
 export function listWorkflowCommand(checker: CodeChecker): void {
   const workflows = checker.listWorkflows();

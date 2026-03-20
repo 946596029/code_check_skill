@@ -1,4 +1,4 @@
-import type { CheckReport } from "@code-check/core";
+import type { CheckReport } from "@greyworld/code-check-core";
 
 type RuleResult = CheckReport["results"][number];
 
