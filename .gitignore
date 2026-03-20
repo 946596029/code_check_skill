@@ -4,6 +4,7 @@ dist/
 *.js.map
 data/
 logs/
+.npmrc
 
 .vscode/
 .cursor/
