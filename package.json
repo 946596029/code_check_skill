@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "pnpm install && pnpm -r build",
+    "build": "pnpm -r build",
     "build:core": "pnpm --filter @greyworld/code-check-core build",
     "build:cli": "pnpm --filter @greyworld/code-check-cli build",
     "cli": "node packages/cli/dist/index.js",
