@@ -1,6 +1,6 @@
 {
   "name": "@greyworld/code-check-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered code review CLI tool",
   "license": "MIT",
   "author": "greyworld",
@@ -8,11 +8,12 @@
     "code-check": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "main": "dist/index.js",
-  "publishConfig": { 
-    "access": "public" 
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc",

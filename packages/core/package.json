@@ -1,16 +1,17 @@
 {
   "name": "@greyworld/code-check-core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered code review core library",
   "license": "MIT",
   "author": "greyworld",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "publishConfig": { 
-    "access": "public" 
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc",
