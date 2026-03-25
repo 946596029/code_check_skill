@@ -1,3 +1,4 @@
+import { ar } from "zod/v4/locales";
 import {
     MarkdownParser,
     type MarkdownNode,
@@ -218,26 +219,23 @@ export function buildArgumentList(
     if (!section) return null;
 
     const description = extractSectionDescription(parser, section);
-    const topList = findFirstNodeByType(section, "list");
-    const args = topList
-        ? parseArgumentItemsFromList(parser, source, topList, diagnostics)
-        : [];
+    const collected = collectSectionItems(
+        parser,
+        source,
+        section,
+        diagnostics,
+        parseArgumentItemsFromList,
+    );
+    const args = collected.topLevelItems;
 
-    const nestedLists = collectNestedSupportLists(parser, section);
-    for (const nested of nestedLists) {
-        const children = parseArgumentItemsFromList(
-            parser,
-            source,
-            nested.listNode,
-            diagnostics,
-        );
-        const attached = attachNestedArguments(args, nested.parentName, children);
+    for (const nested of collected.nestedGroups) {
+        const attached = attachNestedArguments(args, nested.parentName, nested.items);
         if (!attached) {
             diagnostics.push({
                 level: "warning",
                 code: "DOC_ARGUMENT_NESTED_PARENT_NOT_FOUND",
                 message: `Nested argument block parent not found: ${nested.parentName}`,
-                sourceRange: nested.listNode.sourceRange ?? undefined,
+                sourceRange: nested.sourceRange,
             });
         }
     }
@@ -268,26 +266,23 @@ export function buildAttributeList(
     if (!sectionInfo) return null;
 
     const description = extractSectionDescription(parser, sectionInfo.nodes);
-    const topList = findFirstNodeByType(sectionInfo.nodes, "list");
-    const attrs = topList
-        ? parseAttributeItemsFromList(parser, source, topList, diagnostics)
-        : [];
+    const collected = collectSectionItems(
+        parser,
+        source,
+        sectionInfo.nodes,
+        diagnostics,
+        parseAttributeItemsFromList,
+    );
+    const attrs = collected.topLevelItems;
 
-    const nestedLists = collectNestedSupportLists(parser, sectionInfo.nodes);
-    for (const nested of nestedLists) {
-        const children = parseAttributeItemsFromList(
-            parser,
-            source,
-            nested.listNode,
-            diagnostics,
-        );
-        const attached = attachNestedAttributes(attrs, nested.parentName, children);
+    for (const nested of collected.nestedGroups) {
+        const attached = attachNestedAttributes(attrs, nested.parentName, nested.items);
         if (!attached) {
             diagnostics.push({
                 level: "warning",
                 code: "DOC_ATTRIBUTE_NESTED_PARENT_NOT_FOUND",
                 message: `Nested attribute block parent not found: ${nested.parentName}`,
-                sourceRange: nested.listNode.sourceRange ?? undefined,
+                sourceRange: nested.sourceRange,
             });
         }
     }
@@ -574,27 +569,67 @@ function hasComputedArgument(args: Argument[]): boolean {
     return false;
 }
 
-function collectNestedSupportLists(
+interface CollectedSectionItems<T> {
+    topLevelItems: T[];
+    nestedGroups: Array<{
+        parentName: string;
+        items: T[];
+        sourceRange?: SourceRange;
+    }>;
+}
+
+function collectSectionItems<T>(
     parser: MarkdownParser,
+    source: string,
     section: MarkdownNode[],
-): Array<{ parentName: string; listNode: MarkdownNode }> {
-    const collected: Array<{ parentName: string; listNode: MarkdownNode }> = [];
+    diagnostics: BuildDiagnostic[],
+    parseListItems: (
+        parser: MarkdownParser,
+        source: string,
+        listNode: MarkdownNode,
+        diagnostics: BuildDiagnostic[],
+    ) => T[],
+): CollectedSectionItems<T> {
+    const topLevelItems: T[] = [];
+    const nestedGroups: CollectedSectionItems<T>["nestedGroups"] = [];
+    let currentTarget = topLevelItems;
 
-    for (let i = 0; i < section.length; i++) {
-        const node = section[i];
-        if (node.type !== "paragraph") continue;
-
-        const text = parser.getTextContent(node).trim();
-        const parentName = parseSupportBlockName(text);
-        if (!parentName) continue;
-
-        const listNode = findNextNodeByType(section, i + 1, "list");
-        if (listNode) {
-            collected.push({ parentName, listNode });
+    for (const node of section) {
+        if (node.type === "list") {
+            currentTarget.push(
+                ...parseListItems(parser, source, node, diagnostics),
+            );
+            continue;
         }
+
+        if (node.type === "paragraph") {
+            const text = parser.getTextContent(node).trim();
+            const parentName = parseSupportBlockName(text);
+            if (parentName) {
+                const group = {
+                    parentName,
+                    items: [] as T[],
+                    sourceRange: node.sourceRange ?? undefined,
+                };
+                nestedGroups.push(group);
+                currentTarget = group.items;
+                continue;
+            }
+        }
+
+        // Skip unrelated nodes (for example notes and html_block).
+        //
+        // We intentionally do not special-case html_block here:
+        // - If `<a name="..."></a>` is adjacent to `The \`xxx\` block supports:`,
+        //   CommonMark usually keeps both lines in one paragraph, where the
+        //   anchor is an html_inline child and parentName is still detectable.
+        // - If there is a blank line between anchor and supports text, the
+        //   anchor becomes an html_block, which has no supports semantic and is
+        //   naturally skipped; the following supports paragraph will switch
+        //   context correctly.
     }
 
-    return collected;
+    return { topLevelItems, nestedGroups };
 }
 
 function parseSupportBlockName(text: string): string | null {
@@ -688,27 +723,6 @@ function getSectionByTitles(
         if (section) {
             return { title, nodes: section };
         }
-    }
-    return null;
-}
-
-function findFirstNodeByType(
-    nodes: MarkdownNode[],
-    type: MarkdownNode["type"],
-): MarkdownNode | null {
-    for (const node of nodes) {
-        if (node.type === type) return node;
-    }
-    return null;
-}
-
-function findNextNodeByType(
-    nodes: MarkdownNode[],
-    startIndex: number,
-    type: MarkdownNode["type"],
-): MarkdownNode | null {
-    for (let i = startIndex; i < nodes.length; i++) {
-        if (nodes[i].type === type) return nodes[i];
     }
     return null;
 }

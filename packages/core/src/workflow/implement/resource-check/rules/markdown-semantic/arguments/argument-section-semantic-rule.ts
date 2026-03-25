@@ -26,6 +26,19 @@ const META: RuleMeta = {
             `Argument "${name}" is defined in schema but missing from the document.`,
         extraInDoc: (name: unknown, line: unknown) =>
             `Argument "${name}" (line ${line}) is documented but not found in the schema.`,
+        nestedMissingInDoc: (name: unknown, path: unknown) =>
+            `Nested argument "${name}" (under "${path}") is defined in schema but missing from the document.`,
+        nestedExtraInDoc: (name: unknown, path: unknown, line: unknown) =>
+            `Nested argument "${name}" (under "${path}", line ${line}) is documented but not found in the schema.`,
+        nestedDescriptionMismatch: (
+            name: unknown,
+            path: unknown,
+            expected: unknown,
+            actual: unknown,
+            line: unknown,
+        ) =>
+            `Nested argument "${name}" (under "${path}", line ${line}): ` +
+            `description should start with "${expected}" but found "${actual}".`,
     },
 };
 
@@ -208,6 +221,13 @@ export class ArgumentSectionSemanticRule extends Rule {
                     ),
                 );
             }
+
+            this.checkNestedDescriptionAlignment(
+                arg.arguments,
+                field.subFields ?? [],
+                arg.name,
+                failures,
+            );
         }
     }
 
@@ -239,7 +259,105 @@ export class ArgumentSectionSemanticRule extends Rule {
                         line,
                     ),
                 );
+                continue;
             }
+
+            const schemaField = view.arguments.get(arg.name);
+            if (schemaField) {
+                this.checkNestedCompleteness(
+                    arg.arguments,
+                    schemaField.subFields ?? [],
+                    arg.name,
+                    failures,
+                );
+            }
+        }
+    }
+
+    private checkNestedCompleteness(
+        docArgs: Argument[],
+        schemaSubFields: SemanticField[],
+        path: string,
+        failures: RuleCheckResult[],
+    ): void {
+        const schemaFieldMap = new Map(schemaSubFields.map((field) => [field.name, field]));
+        const docArgNames = new Set(docArgs.map((a) => a.name));
+
+        for (const [name] of schemaFieldMap) {
+            if (!docArgNames.has(name)) {
+                failures.push(
+                    this.fail("nestedMissingInDoc", "", undefined, undefined, name, path),
+                );
+            }
+        }
+
+        for (const arg of docArgs) {
+            const schemaField = schemaFieldMap.get(arg.name);
+            if (!schemaField) {
+                const line = getStartLine(arg);
+                failures.push(
+                    this.fail(
+                        "nestedExtraInDoc",
+                        "",
+                        undefined,
+                        RuleCheckResult.fromLine(line),
+                        arg.name,
+                        path,
+                        line,
+                    ),
+                );
+                continue;
+            }
+
+            this.checkNestedCompleteness(
+                arg.arguments,
+                schemaField.subFields ?? [],
+                `${path} > ${arg.name}`,
+                failures,
+            );
+        }
+    }
+
+    private checkNestedDescriptionAlignment(
+        docArgs: Argument[],
+        schemaSubFields: SemanticField[],
+        path: string,
+        failures: RuleCheckResult[],
+    ): void {
+        const schemaFieldMap = new Map(schemaSubFields.map((field) => [field.name, field]));
+        for (const arg of docArgs) {
+            const schemaField = schemaFieldMap.get(arg.name);
+            if (!schemaField || !schemaField.description) continue;
+
+            const expectedPrefix = "Specifies " + lowercaseFirst(schemaField.description);
+            const docDesc = arg.description;
+            if (!docDesc.startsWith(expectedPrefix)) {
+                const previewLen = expectedPrefix.length + 20;
+                const actualPreview = docDesc.length > previewLen
+                    ? docDesc.slice(0, previewLen) + "..."
+                    : docDesc;
+                const line = getStartLine(arg);
+                failures.push(
+                    this.fail(
+                        "nestedDescriptionMismatch",
+                        "",
+                        undefined,
+                        RuleCheckResult.fromLine(line),
+                        arg.name,
+                        path,
+                        expectedPrefix,
+                        actualPreview,
+                        line,
+                    ),
+                );
+            }
+
+            this.checkNestedDescriptionAlignment(
+                arg.arguments,
+                schemaField.subFields ?? [],
+                `${path} > ${arg.name}`,
+                failures,
+            );
         }
     }
 }

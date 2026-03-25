@@ -1,6 +1,6 @@
 import { Rule, RuleCheckResult, type RuleMeta } from "../../../../../types/rule/rule";
 import type { Context } from "../../../../../context/context";
-import type { SchemaSemanticView } from "../../../types";
+import type { SchemaSemanticView, SemanticField } from "../../../types";
 import type { Attribute, DocSemanticView } from "../../../tools/doc-semantic";
 import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../../context-keys";
 
@@ -14,8 +14,15 @@ const META: RuleMeta = {
             `Attribute "${name}" is defined in schema but missing from the document.`,
         extraInDoc: (name: unknown, line: unknown) =>
             `Attribute "${name}" (line ${line}) is documented but not found in the schema.`,
+        nestedMissingInDoc: (name: unknown, path: unknown) =>
+            `Nested attribute "${name}" (under "${path}") is defined in schema but missing from the document.`,
+        nestedExtraInDoc: (name: unknown, path: unknown, line: unknown) =>
+            `Nested attribute "${name}" (under "${path}", line ${line}) is documented but not found in the schema.`,
         descriptionMismatch: (name: unknown, expected: unknown, actual: unknown, line: unknown) =>
             `Attribute "${name}" (line ${line}): description should be "${expected}" ` +
+            `but found "${actual}".`,
+        nestedDescriptionMismatch: (name: unknown, path: unknown, expected: unknown, actual: unknown, line: unknown) =>
+            `Nested attribute "${name}" (under "${path}", line ${line}): description should be "${expected}" ` +
             `but found "${actual}".`,
     },
 };
@@ -100,6 +107,16 @@ export class AttributeSectionSemanticRule extends Rule {
                     ),
                 );
             }
+
+            const schemaField = view.attributes.get(attr.name);
+            if (schemaField) {
+                this.checkNestedCompleteness(
+                    attr.attributes,
+                    schemaField.subFields ?? [],
+                    attr.name,
+                    failures,
+                );
+            }
         }
     }
 
@@ -133,6 +150,100 @@ export class AttributeSectionSemanticRule extends Rule {
                     ),
                 );
             }
+
+            this.checkNestedDescriptionAlignment(
+                attr.attributes,
+                field.subFields ?? [],
+                attr.name,
+                failures,
+            );
+        }
+    }
+
+    private checkNestedCompleteness(
+        docAttrs: Attribute[],
+        schemaSubFields: SemanticField[],
+        path: string,
+        failures: RuleCheckResult[],
+    ): void {
+        const schemaFieldMap = new Map(schemaSubFields.map((field) => [field.name, field]));
+        const docAttrNames = new Set(docAttrs.map((a) => a.name));
+
+        for (const [name] of schemaFieldMap) {
+            if (!docAttrNames.has(name)) {
+                failures.push(
+                    this.fail("nestedMissingInDoc", "", undefined, undefined, name, path),
+                );
+            }
+        }
+
+        for (const attr of docAttrs) {
+            const schemaField = schemaFieldMap.get(attr.name);
+            if (!schemaField) {
+                const line = getStartLine(attr);
+                failures.push(
+                    this.fail(
+                        "nestedExtraInDoc",
+                        "",
+                        undefined,
+                        RuleCheckResult.fromLine(line),
+                        attr.name,
+                        path,
+                        line,
+                    ),
+                );
+                continue;
+            }
+
+            this.checkNestedCompleteness(
+                attr.attributes,
+                schemaField.subFields ?? [],
+                `${path} > ${attr.name}`,
+                failures,
+            );
+        }
+    }
+
+    private checkNestedDescriptionAlignment(
+        docAttrs: Attribute[],
+        schemaSubFields: SemanticField[],
+        path: string,
+        failures: RuleCheckResult[],
+    ): void {
+        const schemaFieldMap = new Map(schemaSubFields.map((field) => [field.name, field]));
+        for (const attr of docAttrs) {
+            const schemaField = schemaFieldMap.get(attr.name);
+            if (!schemaField) continue;
+
+            const expected = schemaField.description.trim();
+            const actual = attr.description.trim();
+            if (expected && actual !== expected) {
+                const previewLen = Math.min(expected.length + 20, 80);
+                const actualPreview = actual.length > previewLen
+                    ? actual.slice(0, previewLen) + "..."
+                    : actual;
+                const line = getStartLine(attr);
+                failures.push(
+                    this.fail(
+                        "nestedDescriptionMismatch",
+                        "",
+                        undefined,
+                        RuleCheckResult.fromLine(line),
+                        attr.name,
+                        path,
+                        expected,
+                        actualPreview,
+                        line,
+                    ),
+                );
+            }
+
+            this.checkNestedDescriptionAlignment(
+                attr.attributes,
+                schemaField.subFields ?? [],
+                `${path} > ${attr.name}`,
+                failures,
+            );
         }
     }
 }

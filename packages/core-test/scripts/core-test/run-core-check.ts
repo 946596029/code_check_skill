@@ -2,8 +2,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
     CodeChecker,
-} from "@code-check/core";
-import type { CheckReport } from "@code-check/core";
+} from "@greyworld/code-check-core";
+import type { CheckReport } from "@greyworld/code-check-core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

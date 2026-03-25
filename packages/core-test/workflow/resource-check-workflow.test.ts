@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "path";
-import { CodeChecker } from "@code-check/core";
+import { CodeChecker } from "@greyworld/code-check-core";
 import {
     parseResourceCheckInput,
     resolveResourcePaths,
@@ -611,6 +611,144 @@ describe("ArgumentSectionSemanticRule", () => {
         const msgs = collectFailureMessages(results);
         expect(msgs.every((m) => !m.includes("description"))).toBe(true);
     });
+
+    it("should pass when nested arguments match schema", async () => {
+        const view = makeView(new Map([["settings", makeField({
+            name: "settings",
+            required: false,
+            optional: true,
+            description: "The settings block.",
+            subFields: [makeField({
+                name: "timeout",
+                required: false,
+                optional: true,
+                description: "The timeout value.",
+            })],
+        })]]));
+        const docView = makeDocSemanticView([makeArg({
+            name: "settings",
+            description: "Specifies the settings block.",
+            arguments: [makeArg({
+                name: "timeout",
+                description: "Specifies the timeout value.",
+            })],
+        })]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should fail when nested schema argument is missing in doc", async () => {
+        const view = makeView(new Map([["settings", makeField({
+            name: "settings",
+            required: false,
+            optional: true,
+            description: "The settings block.",
+            subFields: [makeField({
+                name: "timeout",
+                required: false,
+                optional: true,
+                description: "The timeout value.",
+            })],
+        })]]));
+        const docView = makeDocSemanticView([makeArg({
+            name: "settings",
+            description: "Specifies the settings block.",
+            arguments: [],
+        })]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("Nested argument") && m.includes("missing from the document"))).toBe(true);
+    });
+
+    it("should fail when nested doc argument is extra", async () => {
+        const view = makeView(new Map([["settings", makeField({
+            name: "settings",
+            required: false,
+            optional: true,
+            description: "The settings block.",
+            subFields: [],
+        })]]));
+        const docView = makeDocSemanticView([makeArg({
+            name: "settings",
+            description: "Specifies the settings block.",
+            arguments: [makeArg({
+                name: "timeout",
+                description: "Specifies the timeout value.",
+            })],
+        })]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("Nested argument") && m.includes("not found in the schema"))).toBe(true);
+    });
+
+    it("should fail when nested argument description mismatches", async () => {
+        const view = makeView(new Map([["settings", makeField({
+            name: "settings",
+            required: false,
+            optional: true,
+            description: "The settings block.",
+            subFields: [makeField({
+                name: "timeout",
+                required: false,
+                optional: true,
+                description: "The timeout value.",
+            })],
+        })]]));
+        const docView = makeDocSemanticView([makeArg({
+            name: "settings",
+            description: "Specifies the settings block.",
+            arguments: [makeArg({
+                name: "timeout",
+                description: "Timeout in seconds.",
+            })],
+        })]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("Nested argument") && m.includes("description should start with"))).toBe(true);
+    });
+
+    it("should recursively check multi-level nested arguments", async () => {
+        const view = makeView(new Map([["settings", makeField({
+            name: "settings",
+            required: false,
+            optional: true,
+            description: "The settings block.",
+            subFields: [makeField({
+                name: "network",
+                required: false,
+                optional: true,
+                description: "The network block.",
+                subFields: [makeField({
+                    name: "timeout",
+                    required: false,
+                    optional: true,
+                    description: "The timeout value.",
+                })],
+            })],
+        })]]));
+        const docView = makeDocSemanticView([makeArg({
+            name: "settings",
+            description: "Specifies the settings block.",
+            arguments: [makeArg({
+                name: "network",
+                description: "Specifies the network block.",
+                arguments: [],
+            })],
+        })]);
+
+        const rule = new ArgumentSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes('Nested argument "timeout"') && m.includes('under "settings > network"'))).toBe(true);
+    });
 });
 
 describe("AttributeSectionSemanticRule", () => {
@@ -765,6 +903,124 @@ describe("AttributeSectionSemanticRule", () => {
         const msgs = collectFailureMessages(results);
         expect(msgs.some((m) => m.includes("missing from the document"))).toBe(true);
         expect(msgs.some((m) => m.includes("not found in the schema"))).toBe(true);
+    });
+
+    it("should pass when nested attributes match schema", async () => {
+        const view = makeAttrView(new Map([["settings", makeAttrField({
+            name: "settings",
+            description: "The settings block.",
+            subFields: [makeAttrField({
+                name: "timeout",
+                description: "The timeout value.",
+            })],
+        })]]));
+        const docView = makeAttrDocSemanticView([makeAttr({
+            name: "settings",
+            description: "The settings block.",
+            attributes: [makeAttr({
+                name: "timeout",
+                description: "The timeout value.",
+            })],
+        })]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        expect(results[0].success).toBe(true);
+    });
+
+    it("should fail when nested schema attribute is missing in doc", async () => {
+        const view = makeAttrView(new Map([["settings", makeAttrField({
+            name: "settings",
+            description: "The settings block.",
+            subFields: [makeAttrField({
+                name: "timeout",
+                description: "The timeout value.",
+            })],
+        })]]));
+        const docView = makeAttrDocSemanticView([makeAttr({
+            name: "settings",
+            description: "The settings block.",
+            attributes: [],
+        })]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("Nested attribute") && m.includes("missing from the document"))).toBe(true);
+    });
+
+    it("should fail when nested doc attribute is extra", async () => {
+        const view = makeAttrView(new Map([["settings", makeAttrField({
+            name: "settings",
+            description: "The settings block.",
+            subFields: [],
+        })]]));
+        const docView = makeAttrDocSemanticView([makeAttr({
+            name: "settings",
+            description: "The settings block.",
+            attributes: [makeAttr({
+                name: "timeout",
+                description: "The timeout value.",
+            })],
+        })]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("Nested attribute") && m.includes("not found in the schema"))).toBe(true);
+    });
+
+    it("should fail when nested attribute description mismatches", async () => {
+        const view = makeAttrView(new Map([["settings", makeAttrField({
+            name: "settings",
+            description: "The settings block.",
+            subFields: [makeAttrField({
+                name: "timeout",
+                description: "The timeout value.",
+            })],
+        })]]));
+        const docView = makeAttrDocSemanticView([makeAttr({
+            name: "settings",
+            description: "The settings block.",
+            attributes: [makeAttr({
+                name: "timeout",
+                description: "Timeout in seconds.",
+            })],
+        })]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes("Nested attribute") && m.includes("description should be"))).toBe(true);
+    });
+
+    it("should recursively check multi-level nested attributes", async () => {
+        const view = makeAttrView(new Map([["settings", makeAttrField({
+            name: "settings",
+            description: "The settings block.",
+            subFields: [makeAttrField({
+                name: "network",
+                description: "The network block.",
+                subFields: [makeAttrField({
+                    name: "timeout",
+                    description: "The timeout value.",
+                })],
+            })],
+        })]]));
+        const docView = makeAttrDocSemanticView([makeAttr({
+            name: "settings",
+            description: "The settings block.",
+            attributes: [makeAttr({
+                name: "network",
+                description: "The network block.",
+                attributes: [],
+            })],
+        })]);
+
+        const rule = new AttributeSectionSemanticRule();
+        const results = await rule.test("", undefined, buildCtx(view, docView));
+        const msgs = collectFailureMessages(results);
+        expect(msgs.some((m) => m.includes('Nested attribute "timeout"') && m.includes('under "settings > network"'))).toBe(true);
     });
 });
 
