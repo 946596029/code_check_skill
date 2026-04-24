@@ -63,6 +63,7 @@ export class ArgumentSectionSemanticRule extends Rule {
 
         const view = parentCtx.get<SchemaSemanticView>(CTX_SCHEMA_SEMANTIC_VIEW);
         const docView = parentCtx.get<DocSemanticView>(CTX_DOC_SEMANTIC_VIEW);
+
         if (!view || !docView) {
             return [RuleCheckResult.pass("Schema view or doc semantic view unavailable, rule skipped")];
         }
