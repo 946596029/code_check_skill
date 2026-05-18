@@ -539,7 +539,7 @@ export class MarkdownParser {
         if (!firstLine) return null;
 
         return {
-            text: firstLine.startsWith("* ") ? firstLine : `* ${firstLine}`,
+            text: firstLine,
             startLine: nodeText.startLine,
         };
     }

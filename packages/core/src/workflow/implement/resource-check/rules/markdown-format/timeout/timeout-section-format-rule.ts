@@ -9,7 +9,7 @@ import { toSectionRuleResults } from "../shared/section-check-result";
 const TIMEOUT_SECTION_TITLES = ["Timeouts", "Timeout"];
 const TIMEOUT_SECTION_INTRO =
     "This resource provides the following timeouts configuration options:";
-const TIMEOUT_ACTION_PATTERN = /^`(?:create|update|delete)`\s-\s/i;
+const TIMEOUT_ACTION_PATTERN = /^\* `(?:create|update|delete)`\s-\s/i;
 
 const TIMEOUT_BULLET_PATTERN = new LinePattern([
     literal("* "),
