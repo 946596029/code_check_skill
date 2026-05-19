@@ -100,6 +100,9 @@ export class LinePattern {
 
     /**
      * Produce a diagnostic message when a line fails to match.
+     *
+     * Includes the segment that failed, the remaining unmatched text,
+     * and — when available — the allowed-value enumeration and typo hints.
      */
     describeFailure(line: string): string | null {
         const result = this.match(line);
@@ -107,10 +110,23 @@ export class LinePattern {
 
         const { segmentIndex, expectedDisplay, remaining } = result.error;
         const pos = line.length - remaining.length;
-        return (
-            `Mismatch at position ${pos} (segment #${segmentIndex}): ` +
-            `expected ${expectedDisplay}, ` +
-            `got "${remaining.slice(0, 20)}${remaining.length > 20 ? "..." : ""}"`
-        );
+        const seg = segmentIndex < this.segments.length
+            ? this.segments[segmentIndex]
+            : undefined;
+
+        let msg =
+            `Segment "${expectedDisplay}" mismatch at position ${pos}, ` +
+            `got "${remaining.slice(0, 30)}${remaining.length > 30 ? "..." : ""}"`;
+
+        if (seg?.failureDetail) {
+            msg += `. Allowed: ${seg.failureDetail}`;
+        }
+
+        if (seg?.failureHint) {
+            const hint = seg.failureHint(remaining);
+            if (hint) msg += `. ${hint}`;
+        }
+
+        return msg;
     }
 }

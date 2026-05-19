@@ -29,6 +29,14 @@ export class BulletLine {
     public getLastPattern(): LinePattern | null {
         return this.lastPattern;
     }
+
+    /**
+     * Produce a human-readable failure description using the last pattern.
+     * Returns null if the line matches or no pattern has been recorded.
+     */
+    public describeFailure(): string | null {
+        return this.lastPattern?.describeFailure(this.text) ?? null;
+    }
 }
 
 /** Passed to eachBulletItemAsync callback. */

@@ -62,6 +62,37 @@ export function optional(segment: Segment): Segment {
     return { ...segment, optional: true };
 }
 
+const COMMON_TYPOS: Record<string, string> = {
+    Integer: "Int",
+    Number: "Int",
+    Boolean: "Bool",
+    Float64: "Float",
+    Array: "List",
+    Dictionary: "Map",
+    Object: "Map",
+    StringType: "String",
+    IntType: "Int",
+    BoolType: "Bool",
+};
+
+function buildCsvTypoHint(
+    remaining: string,
+    slots: CsvSlot[],
+): string | undefined {
+    const m = /^\(([^)]+)\)/.exec(remaining);
+    if (!m) return undefined;
+    const parts = m[1].split(/,\s*/);
+    const allAllowed = new Set(slots.flatMap((s) => s.values));
+    const suggestions: string[] = [];
+    for (const part of parts) {
+        if (!allAllowed.has(part) && COMMON_TYPOS[part]) {
+            suggestions.push(`"${part}" → "${COMMON_TYPOS[part]}"`);
+        }
+    }
+    if (suggestions.length === 0) return undefined;
+    return `possible typo — ${suggestions.join("; ")}`;
+}
+
 /** One slot in a CSV-parenthesized group. */
 export interface CsvSlot {
     /** Display name for this slot. */
@@ -102,8 +133,19 @@ export function csvParenthesized(slots: CsvSlot[]): Segment {
         display += `[, ${trailing.name}...]`;
     }
 
+    const failureDetailParts = slots.map((s) => {
+        const suffix = s.zeroOrMore ? " (0+)" : "";
+        return `${s.name}${suffix}: ${s.values.join("|")}`;
+    });
+    const failureDetail = failureDetailParts.join("; ");
+
+    const failureHint = (remaining: string): string | undefined =>
+        buildCsvTypoHint(remaining, slots);
+
     return {
         regex: new RegExp(`\\(${inner}\\)`),
         display: `(${display})`,
+        failureDetail,
+        failureHint,
     };
 }

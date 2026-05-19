@@ -193,11 +193,10 @@ export class SectionCheck {
                     const ok = step.check(firstLine);
                     if (ok) continue;
 
-                    const pattern = firstLine.getLastPattern();
+                    const detail = firstLine.describeFailure();
                     failures.push({
-                        message: pattern
-                            ? `Invalid ${this.targetDisplay()} bullet format at line ${firstLine.startLine}. ` +
-                              `Expected: ${pattern.toDisplayFormat()}`
+                        message: detail
+                            ? `Invalid ${this.targetDisplay()} bullet format at line ${firstLine.startLine}: ${detail}`
                             : `Invalid ${this.targetDisplay()} bullet format at line ${firstLine.startLine}.`,
                         line: firstLine.startLine,
                     });

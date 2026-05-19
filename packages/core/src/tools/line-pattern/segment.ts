@@ -13,6 +13,12 @@ export interface Segment {
 
     /** Whether this segment is optional. */
     readonly optional?: boolean;
+
+    /** Extra detail appended when this segment fails to match (e.g. allowed value enumeration). */
+    readonly failureDetail?: string;
+
+    /** Optional function that inspects the remaining input and returns a hint string (e.g. typo suggestion). */
+    readonly failureHint?: (remaining: string) => string | undefined;
 }
 
 export interface SegmentMatchResult {

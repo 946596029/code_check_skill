@@ -209,8 +209,53 @@ describe("LinePattern", () => {
         it("should return a readable message for a mismatch", () => {
             const line = "* name - broken";
             const msg = argBulletPattern.describeFailure(line);
-            expect(msg).toContain("Mismatch at position");
-            expect(msg).toContain("expected");
+            expect(msg).toContain("mismatch at position");
+            expect(msg).toContain("got");
+        });
+
+        it("should include allowed values when csvParenthesized segment fails", () => {
+            const line =
+                "* `perm_space` - (Required, Integer, NonUpdatable) Specifies the space";
+            const msg = argBulletPattern.describeFailure(line);
+            expect(msg).not.toBeNull();
+            expect(msg!).toContain("Allowed:");
+            expect(msg!).toContain("Type: String|Int|Bool|List|Map|Float|Set");
+            expect(msg!).toContain("Modifier: Required|Optional");
+        });
+
+        it("should suggest typo correction for common mistakes like Integer", () => {
+            const line =
+                "* `perm_space` - (Required, Integer, NonUpdatable) Specifies the space";
+            const msg = argBulletPattern.describeFailure(line);
+            expect(msg).not.toBeNull();
+            expect(msg!).toContain('possible typo');
+            expect(msg!).toContain('"Integer" → "Int"');
+        });
+
+        it("should suggest typo correction for Boolean → Bool", () => {
+            const line =
+                "* `flag` - (Required, Boolean) Specifies the flag";
+            const msg = argBulletPattern.describeFailure(line);
+            expect(msg).not.toBeNull();
+            expect(msg!).toContain('"Boolean" → "Bool"');
+        });
+
+        it("should suggest multiple typo corrections", () => {
+            const line =
+                "* `x` - (Mandatory, Number) Specifies x";
+            const msg = argBulletPattern.describeFailure(line);
+            expect(msg).not.toBeNull();
+            expect(msg!).toContain('"Number" → "Int"');
+        });
+
+        it("should include failureDetail but no hint when typo is not recognized", () => {
+            const line =
+                "* `x` - (Required, CustomType) Specifies x";
+            const msg = argBulletPattern.describeFailure(line);
+            expect(msg).not.toBeNull();
+            expect(msg!).toContain("Allowed:");
+            expect(msg!).toContain("Type: String|Int|Bool|List|Map|Float|Set");
+            expect(msg!).not.toContain("possible typo");
         });
     });
 
