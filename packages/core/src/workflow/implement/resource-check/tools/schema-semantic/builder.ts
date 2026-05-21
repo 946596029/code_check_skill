@@ -42,37 +42,97 @@ function classifyField(
 ): void {
     if (field.internal) return;
 
-    const semantic = toSemanticField(field, forceNewSet, nonUpdatableSet);
-    if (field.required || field.optional) {
-        args.set(field.name, semantic);
-    } else {
-        attrs.set(field.name, semantic);
+    const argSemantic = toSemanticField(field, forceNewSet, nonUpdatableSet, field.name);
+    const attrSemantic = toSemanticField(field, forceNewSet, nonUpdatableSet, field.name);
+
+    if (field.subFields && field.subFields.length > 0) {
+        const { argSubFields, attrSubFields } = separateSubFields(
+            field.subFields,
+            forceNewSet,
+            nonUpdatableSet,
+            field.name,
+        );
+        argSemantic.subFields = argSubFields;
+        attrSemantic.subFields = attrSubFields;
     }
+
+    if (field.required || field.optional) {
+        args.set(field.name, argSemantic);
+    }
+
+    if (field.computed && !field.required && !field.optional) {
+        attrs.set(field.name, attrSemantic);
+    }
+
+    const hasComputedSubFields = attrSemantic.subFields && attrSemantic.subFields.length > 0;
+    if (hasComputedSubFields) {
+        attrs.set(field.name, attrSemantic);
+    }
+}
+
+function separateSubFields(
+    subFields: SchemaField[],
+    forceNewSet: Set<string>,
+    nonUpdatableSet: Set<string>,
+    parentPath: string = "",
+): { argSubFields: SemanticField[]; attrSubFields: SemanticField[] } {
+    const argSubFields: SemanticField[] = [];
+    const attrSubFields: SemanticField[] = [];
+
+    for (const sub of subFields) {
+        if (sub.internal) continue;
+
+        const fieldPath = parentPath ? `${parentPath}.${sub.name}` : sub.name;
+        const subSemantic = toSemanticField(sub, forceNewSet, nonUpdatableSet, fieldPath);
+        let attrSubSemantic: SemanticField | undefined;
+
+        if (sub.subFields && sub.subFields.length > 0) {
+            const nested = separateSubFields(
+                sub.subFields,
+                forceNewSet,
+                nonUpdatableSet,
+                fieldPath,
+            );
+            subSemantic.subFields = nested.argSubFields;
+
+            if (nested.attrSubFields.length > 0) {
+                attrSubSemantic = toSemanticField(sub, forceNewSet, nonUpdatableSet, fieldPath);
+                attrSubSemantic.subFields = nested.attrSubFields;
+            }
+        }
+
+        if (sub.required || sub.optional) {
+            argSubFields.push(subSemantic);
+        }
+
+        if (sub.computed && !sub.required && !sub.optional) {
+            attrSubFields.push(subSemantic);
+        }
+
+        if (attrSubSemantic) {
+            attrSubFields.push(attrSubSemantic);
+        }
+    }
+
+    return { argSubFields, attrSubFields };
 }
 
 function toSemanticField(
     field: SchemaField,
     forceNewSet: Set<string>,
     nonUpdatableSet: Set<string>,
+    fieldPath: string = field.name,
 ): SemanticField {
-    const result: SemanticField = {
+    return {
         name: field.name,
         type: field.type,
         required: field.required,
         optional: field.optional,
         computed: field.computed,
-        forceNew: field.forceNew || forceNewSet.has(field.name),
-        nonUpdatable: nonUpdatableSet.has(field.name),
+        forceNew: field.forceNew || forceNewSet.has(fieldPath),
+        nonUpdatable: nonUpdatableSet.has(fieldPath),
         description: field.description,
     };
-
-    if (field.subFields && field.subFields.length > 0) {
-        result.subFields = field.subFields.map(
-            (sub) => toSemanticField(sub, forceNewSet, nonUpdatableSet),
-        );
-    }
-
-    return result;
 }
 
 const IMPLICIT_ATTRIBUTES: SemanticField[] = [
