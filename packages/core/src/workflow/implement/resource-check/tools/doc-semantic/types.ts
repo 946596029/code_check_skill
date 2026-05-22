@@ -44,12 +44,21 @@ export interface ExampleList {
     sourceRange?: SourceRange;
 }
 
-export interface Argument {
+export interface ArgumentNode {
     name: string;
     tags: string[];
     description: string;
     details: StringTree;
-    arguments: Argument[];
+    children: ArgumentNode[];
+    anchorId?: string;
+    sourceRange?: SourceRange;
+}
+
+export interface ArgumentBlock {
+    anchorId: string;
+    paramName: string;
+    parentAnchorId?: string;
+    nodes: ArgumentNode[];
     sourceRange?: SourceRange;
 }
 
@@ -57,22 +66,31 @@ export interface ArgumentList {
     title: string;
     description: string;
     isComputed: () => boolean;
-    arguments: Argument[];
+    arguments: ArgumentNode[];
     sourceRange?: SourceRange;
 }
 
-export interface Attribute {
+export interface AttributeNode {
     name: string;
     description: string;
     details: StringTree;
-    attributes: Attribute[];
+    children: AttributeNode[];
+    anchorId?: string;
+    sourceRange?: SourceRange;
+}
+
+export interface AttributeBlock {
+    anchorId: string;
+    paramName: string;
+    parentAnchorId?: string;
+    nodes: AttributeNode[];
     sourceRange?: SourceRange;
 }
 
 export interface AttributeList {
     title: string;
     description: string;
-    attributes: Attribute[];
+    attributes: AttributeNode[];
     sourceRange?: SourceRange;
 }
 

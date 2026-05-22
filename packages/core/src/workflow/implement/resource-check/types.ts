@@ -10,8 +10,8 @@ export type {
     SchemaSemanticView,
 } from "./tools/schema-semantic";
 export type {
-    Argument,
-    Attribute,
+    ArgumentNode,
+    AttributeNode,
     ArgumentList,
     AttributeList,
 } from "./tools/doc-semantic";

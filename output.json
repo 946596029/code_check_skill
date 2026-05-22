@@ -1,0 +1,1510 @@
+{
+  "blocks": [
+    {
+      "kind": "Title",
+      "node": {
+        "title": "huaweicloud_modelartsv2_workflow",
+        "description": "Manages a ModelArts workflow resource within HuaweiCloud."
+      }
+    },
+    {
+      "kind": "ExampleList",
+      "node": {
+        "title": "Example Usage",
+        "examples": [
+          {
+            "title": "Create a basic workflow",
+            "code": "resource \"huaweicloud_modelartsv2_workflow\" \"test\" {\n  name        = \"demo-workflow\"\n  description = \"created by terraform\"\n}\n"
+          },
+          {
+            "title": "Create a workflow with steps and storages",
+            "code": "resource \"huaweicloud_modelartsv2_workflow\" \"test\" {\n  name         = \"demo-workflow\"\n  description  = \"workflow with steps\"\n  workspace_id = \"0\"\n\n  steps {\n    name = \"training\"\n    type = \"job\"\n\n    policy {\n      poll_interval_seconds = 60\n      max_execution_minutes = 120\n    }\n  }\n\n  storages {\n    name = \"workflow_storage\"\n    type = \"obs\"\n    path = \"/obs-bucket/workflow/\"\n  }\n\n  labels = [\"terraform\", \"test\"]\n}\n"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ArgumentList",
+      "node": {
+        "title": "Argument Reference",
+        "description": "The following arguments are supported:",
+        "arguments": [
+          {
+            "name": "region",
+            "tags": [
+              "ForceNew"
+            ],
+            "description": "Specifies the region where the workflow is located. If omitted, the provider-level region will be used. Changing this creates a new resource.",
+            "details": {
+              "text": "Specifies the region where the workflow is located. If omitted, the provider-level region will be used. Changing this creates a new resource.",
+              "children": [
+                {
+                  "text": "If omitted, the provider-level region will be used. Changing this creates a new resource.",
+                  "children": []
+                }
+              ]
+            },
+            "children": []
+          },
+          {
+            "name": "name",
+            "tags": [],
+            "description": "Specifies the name of the workflow. The name consists of `1` to `64` characters, including Chinese and English letters, digits, spaces, underscores (_), and hyphens (-), and must start with a Chinese or English letter.",
+            "details": {
+              "text": "Specifies the name of the workflow. The name consists of `1` to `64` characters, including Chinese and English letters, digits, spaces, underscores (_), and hyphens (-), and must start with a Chinese or English letter.",
+              "children": [
+                {
+                  "text": "The name consists of `1` to `64` characters, including Chinese and English letters, digits, spaces,",
+                  "children": []
+                },
+                {
+                  "text": "underscores (_), and hyphens (-), and must start with a Chinese or English letter.",
+                  "children": []
+                }
+              ]
+            },
+            "children": []
+          },
+          {
+            "name": "description",
+            "tags": [],
+            "description": "Specifies the description of the workflow.",
+            "details": {
+              "text": "Specifies the description of the workflow.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "steps",
+            "tags": [],
+            "description": "Specifies the steps of the workflow. The [steps](#modelartsv2_workflow_steps) structure is documented below.",
+            "details": {
+              "text": "Specifies the steps of the workflow. The [steps](#modelartsv2_workflow_steps) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [steps](#modelartsv2_workflow_steps) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "name",
+                "tags": [],
+                "description": "Specifies the name of the workflow step.",
+                "details": {
+                  "text": "Specifies the name of the workflow step.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "type",
+                "tags": [],
+                "description": "Specifies the type of the workflow step.",
+                "details": {
+                  "text": "Specifies the type of the workflow step.",
+                  "children": [
+                    {
+                      "text": "The valid values are follows:",
+                      "children": []
+                    },
+                    {
+                      "text": "+ **job**: The job type of the workflow step.",
+                      "children": []
+                    },
+                    {
+                      "text": "+ **labeling**: The labeling type of the workflow step.",
+                      "children": []
+                    },
+                    {
+                      "text": "+ **release_dataset**: The release dataset type of the workflow step.",
+                      "children": []
+                    },
+                    {
+                      "text": "+ **model**: The model type of the workflow step.",
+                      "children": []
+                    },
+                    {
+                      "text": "+ **service**: The service type of the workflow step.",
+                      "children": []
+                    },
+                    {
+                      "text": "+ **mrs_job**: The MRS job type of the workflow step.",
+                      "children": []
+                    },
+                    {
+                      "text": "+ **dataset_import**: The dataset import type of the workflow step.",
+                      "children": []
+                    },
+                    {
+                      "text": "+ **create_dataset**: The create dataset type of the workflow step.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": []
+              },
+              {
+                "name": "inputs",
+                "tags": [],
+                "description": "Specifies the inputs of the workflow step. The [inputs](#modelartsv2_workflow_step_inputs) structure is documented below.",
+                "details": {
+                  "text": "Specifies the inputs of the workflow step. The [inputs](#modelartsv2_workflow_step_inputs) structure is documented below.",
+                  "children": [
+                    {
+                      "text": "The [inputs](#modelartsv2_workflow_step_inputs) structure is documented below.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "name",
+                    "tags": [],
+                    "description": "Specifies the name of the input data.",
+                    "details": {
+                      "text": "Specifies the name of the input data.",
+                      "children": []
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "type",
+                    "tags": [],
+                    "description": "Specifies the type of the input. Valid values are **dataset**, **obs**, and **data_selector**.",
+                    "details": {
+                      "text": "Specifies the type of the input. Valid values are **dataset**, **obs**, and **data_selector**.",
+                      "children": [
+                        {
+                          "text": "Valid values are **dataset**, **obs**, and **data_selector**.",
+                          "children": []
+                        }
+                      ]
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "data",
+                    "tags": [],
+                    "description": "Specifies the input data, in JSON format.",
+                    "details": {
+                      "text": "Specifies the input data, in JSON format.",
+                      "children": []
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "value",
+                    "tags": [],
+                    "description": "Specifies the value of the input, in JSON format.",
+                    "details": {
+                      "text": "Specifies the value of the input, in JSON format.",
+                      "children": []
+                    },
+                    "children": []
+                  }
+                ],
+                "anchorId": "modelartsv2_workflow_step_inputs"
+              },
+              {
+                "name": "outputs",
+                "tags": [],
+                "description": "Specifies the outputs of the workflow step. The [outputs](#modelartsv2_workflow_step_outputs) structure is documented below.",
+                "details": {
+                  "text": "Specifies the outputs of the workflow step. The [outputs](#modelartsv2_workflow_step_outputs) structure is documented below.",
+                  "children": [
+                    {
+                      "text": "The [outputs](#modelartsv2_workflow_step_outputs) structure is documented below.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "name",
+                    "tags": [],
+                    "description": "Specifies the name of the output data.",
+                    "details": {
+                      "text": "Specifies the name of the output data.",
+                      "children": []
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "type",
+                    "tags": [],
+                    "description": "Specifies the type of the output. Valid values are **obs** and **model**.",
+                    "details": {
+                      "text": "Specifies the type of the output. Valid values are **obs** and **model**.",
+                      "children": [
+                        {
+                          "text": "Valid values are **obs** and **model**.",
+                          "children": []
+                        }
+                      ]
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "config",
+                    "tags": [],
+                    "description": "Specifies the output configuration, in JSON format.",
+                    "details": {
+                      "text": "Specifies the output configuration, in JSON format.",
+                      "children": []
+                    },
+                    "children": []
+                  }
+                ],
+                "anchorId": "modelartsv2_workflow_step_outputs"
+              },
+              {
+                "name": "title",
+                "tags": [],
+                "description": "Specifies the title of the workflow step.",
+                "details": {
+                  "text": "Specifies the title of the workflow step.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "description",
+                "tags": [],
+                "description": "Specifies the description of the workflow step.",
+                "details": {
+                  "text": "Specifies the description of the workflow step.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "properties",
+                "tags": [],
+                "description": "Specifies the properties of the workflow step, in JSON format.",
+                "details": {
+                  "text": "Specifies the properties of the workflow step, in JSON format.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "depend_steps",
+                "tags": [],
+                "description": "Specifies the dependent steps of the workflow step.",
+                "details": {
+                  "text": "Specifies the dependent steps of the workflow step.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "conditions",
+                "tags": [],
+                "description": "Specifies the execution conditions of the workflow step. The [conditions](#modelartsv2_workflow_step_conditions) structure is documented below.",
+                "details": {
+                  "text": "Specifies the execution conditions of the workflow step. The [conditions](#modelartsv2_workflow_step_conditions) structure is documented below.",
+                  "children": [
+                    {
+                      "text": "The [conditions](#modelartsv2_workflow_step_conditions) structure is documented below.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "type",
+                    "tags": [],
+                    "description": "Specifies the condition type. Valid values are **==**, **!=**, **>**, **>=**, **<**, **<=**, **in**, and **or**.",
+                    "details": {
+                      "text": "Specifies the condition type. Valid values are **==**, **!=**, **>**, **>=**, **<**, **<=**, **in**, and **or**.",
+                      "children": [
+                        {
+                          "text": "Valid values are **==**, **!=**, **>**, **>=**, **<**, **<=**, **in**, and **or**.",
+                          "children": []
+                        }
+                      ]
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "left",
+                    "tags": [],
+                    "description": "Specifies the left branch when the condition is true, in JSON format.",
+                    "details": {
+                      "text": "Specifies the left branch when the condition is true, in JSON format.",
+                      "children": []
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "right",
+                    "tags": [],
+                    "description": "Specifies the right branch when the condition is false, in JSON format.",
+                    "details": {
+                      "text": "Specifies the right branch when the condition is false, in JSON format.",
+                      "children": []
+                    },
+                    "children": []
+                  }
+                ],
+                "anchorId": "modelartsv2_workflow_step_conditions"
+              },
+              {
+                "name": "if_then_steps",
+                "tags": [],
+                "description": "Specifies the conditional branch steps of the workflow step.",
+                "details": {
+                  "text": "Specifies the conditional branch steps of the workflow step.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "else_then_steps",
+                "tags": [],
+                "description": "Specifies the other conditional branch steps of the workflow step.",
+                "details": {
+                  "text": "Specifies the other conditional branch steps of the workflow step.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "policy",
+                "tags": [],
+                "description": "Specifies the execution policy of the workflow step. The [step_policy](#modelartsv2_workflow_step_policy) structure is documented below.",
+                "details": {
+                  "text": "Specifies the execution policy of the workflow step. The [step_policy](#modelartsv2_workflow_step_policy) structure is documented below.",
+                  "children": [
+                    {
+                      "text": "The [step_policy](#modelartsv2_workflow_step_policy) structure is documented below.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "poll_interval_seconds",
+                    "tags": [],
+                    "description": "Specifies the execution interval of the workflow step, in seconds.",
+                    "details": {
+                      "text": "Specifies the execution interval of the workflow step, in seconds.",
+                      "children": []
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "max_execution_minutes",
+                    "tags": [],
+                    "description": "Specifies the maximum execution time of the workflow step, in minutes.",
+                    "details": {
+                      "text": "Specifies the maximum execution time of the workflow step, in minutes.",
+                      "children": []
+                    },
+                    "children": []
+                  }
+                ],
+                "anchorId": "modelartsv2_workflow_step_policy"
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_steps"
+          },
+          {
+            "name": "workspace_id",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the workspace ID to which the workflow belongs. Defaults to \"0\".",
+            "details": {
+              "text": "Specifies the workspace ID to which the workflow belongs. Defaults to \"0\".",
+              "children": [
+                {
+                  "text": "Defaults to \"0\".",
+                  "children": []
+                }
+              ]
+            },
+            "children": []
+          },
+          {
+            "name": "data_requirements",
+            "tags": [],
+            "description": "Specifies the data requirements of the workflow. The [data_requirements](#modelartsv2_workflow_data_requirements) structure is documented below.",
+            "details": {
+              "text": "Specifies the data requirements of the workflow. The [data_requirements](#modelartsv2_workflow_data_requirements) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [data_requirements](#modelartsv2_workflow_data_requirements) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "name",
+                "tags": [],
+                "description": "Specifies the name of the data requirement.",
+                "details": {
+                  "text": "Specifies the name of the data requirement.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "type",
+                "tags": [],
+                "description": "Specifies the type of the data source. Valid values are **dataset**, **obs**, **swr**, **model_list**, **label_task**, and **service**.",
+                "details": {
+                  "text": "Specifies the type of the data source. Valid values are **dataset**, **obs**, **swr**, **model_list**, **label_task**, and **service**.",
+                  "children": [
+                    {
+                      "text": "Valid values are **dataset**, **obs**, **swr**, **model_list**, **label_task**, and **service**.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": []
+              },
+              {
+                "name": "conditions",
+                "tags": [],
+                "description": "Specifies the data constraint conditions. The [conditions](#modelartsv2_workflow_data_requirement_conditions) structure is documented below.",
+                "details": {
+                  "text": "Specifies the data constraint conditions. The [conditions](#modelartsv2_workflow_data_requirement_conditions) structure is documented below.",
+                  "children": [
+                    {
+                      "text": "The [conditions](#modelartsv2_workflow_data_requirement_conditions) structure is documented below.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": [],
+                "anchorId": "modelartsv2_workflow_data_requirement_conditions"
+              },
+              {
+                "name": "value",
+                "tags": [],
+                "description": "Specifies the value of the data requirement, in JSON format.",
+                "details": {
+                  "text": "Specifies the value of the data requirement, in JSON format.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "used_steps",
+                "tags": [],
+                "description": "Specifies the steps that use this data requirement.",
+                "details": {
+                  "text": "Specifies the steps that use this data requirement.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "delay",
+                "tags": [],
+                "description": "Specifies whether the data requirement is delayed.",
+                "details": {
+                  "text": "Specifies whether the data requirement is delayed.",
+                  "children": []
+                },
+                "children": []
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_data_requirements"
+          },
+          {
+            "name": "data",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the data of the workflow. The [data](#modelartsv2_workflow_data) structure is documented below.",
+            "details": {
+              "text": "Specifies the data of the workflow. The [data](#modelartsv2_workflow_data) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [data](#modelartsv2_workflow_data) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "name",
+                "tags": [],
+                "description": "Specifies the name of the data.",
+                "details": {
+                  "text": "Specifies the name of the data.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "type",
+                "tags": [],
+                "description": "Specifies the type of the data source. Valid values are **dataset**, **obs**, **swr**, **model**, **label_task**, **service**, and **image**.",
+                "details": {
+                  "text": "Specifies the type of the data source. Valid values are **dataset**, **obs**, **swr**, **model**, **label_task**, **service**, and **image**.",
+                  "children": [
+                    {
+                      "text": "Valid values are **dataset**, **obs**, **swr**, **model**, **label_task**, **service**, and **image**.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": []
+              },
+              {
+                "name": "value",
+                "tags": [],
+                "description": "Specifies the value of the data.",
+                "details": {
+                  "text": "Specifies the value of the data.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "used_steps",
+                "tags": [],
+                "description": "Specifies the steps that use this data.",
+                "details": {
+                  "text": "Specifies the steps that use this data.",
+                  "children": []
+                },
+                "children": []
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_data"
+          },
+          {
+            "name": "parameters",
+            "tags": [],
+            "description": "Specifies the parameters of the workflow. The [parameters](#modelartsv2_workflow_parameters) structure is documented below.",
+            "details": {
+              "text": "Specifies the parameters of the workflow. The [parameters](#modelartsv2_workflow_parameters) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [parameters](#modelartsv2_workflow_parameters) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "name",
+                "tags": [],
+                "description": "Specifies the name of the workflow parameter.",
+                "details": {
+                  "text": "Specifies the name of the workflow parameter.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "type",
+                "tags": [],
+                "description": "Specifies the type of the workflow parameter. Valid values are **str**, **int**, **bool**, and **float**.",
+                "details": {
+                  "text": "Specifies the type of the workflow parameter. Valid values are **str**, **int**, **bool**, and **float**.",
+                  "children": [
+                    {
+                      "text": "Valid values are **str**, **int**, **bool**, and **float**.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": []
+              },
+              {
+                "name": "description",
+                "tags": [],
+                "description": "Specifies the description of the workflow parameter.",
+                "details": {
+                  "text": "Specifies the description of the workflow parameter.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "example",
+                "tags": [],
+                "description": "Specifies the example of the workflow parameter, in JSON format.",
+                "details": {
+                  "text": "Specifies the example of the workflow parameter, in JSON format.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "delay",
+                "tags": [],
+                "description": "Specifies whether the workflow parameter is delayed.",
+                "details": {
+                  "text": "Specifies whether the workflow parameter is delayed.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "default",
+                "tags": [],
+                "description": "Specifies the default value of the workflow parameter, in JSON format.",
+                "details": {
+                  "text": "Specifies the default value of the workflow parameter, in JSON format.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "value",
+                "tags": [],
+                "description": "Specifies the value of the workflow parameter, in JSON format.",
+                "details": {
+                  "text": "Specifies the value of the workflow parameter, in JSON format.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "enum",
+                "tags": [],
+                "description": "Specifies the enumeration items of the workflow parameter, in JSON format.",
+                "details": {
+                  "text": "Specifies the enumeration items of the workflow parameter, in JSON format.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "used_steps",
+                "tags": [],
+                "description": "Specifies the steps that use this parameter.",
+                "details": {
+                  "text": "Specifies the steps that use this parameter.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "format",
+                "tags": [],
+                "description": "Specifies the data format of the workflow parameter.",
+                "details": {
+                  "text": "Specifies the data format of the workflow parameter.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "constraint",
+                "tags": [],
+                "description": "Specifies the constraint of the workflow parameter, in JSON format.",
+                "details": {
+                  "text": "Specifies the constraint of the workflow parameter, in JSON format.",
+                  "children": []
+                },
+                "children": []
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_parameters"
+          },
+          {
+            "name": "source_workflow_id",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the source workflow ID for copying.",
+            "details": {
+              "text": "Specifies the source workflow ID for copying.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "gallery_subscription",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the gallery subscription information of the workflow. The [gallery_subscription](#modelartsv2_workflow_gallery_subscription) structure is documented below.",
+            "details": {
+              "text": "Specifies the gallery subscription information of the workflow. The [gallery_subscription](#modelartsv2_workflow_gallery_subscription) structure is documented below.",
+              "children": [
+                {
+                  "text": "the workflow.",
+                  "children": []
+                },
+                {
+                  "text": "The [gallery_subscription](#modelartsv2_workflow_gallery_subscription) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "content_id",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the asset ID of the gallery subscription.",
+                "details": {
+                  "text": "Specifies the asset ID of the gallery subscription.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "version_id",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the version ID of the gallery subscription.",
+                "details": {
+                  "text": "Specifies the version ID of the gallery subscription.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "expired_at",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the expiration time of the gallery subscription, in RFC3339 format.",
+                "details": {
+                  "text": "Specifies the expiration time of the gallery subscription, in RFC3339 format.",
+                  "children": [
+                    {
+                      "text": "in RFC3339 format.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": []
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_gallery_subscription"
+          },
+          {
+            "name": "storages",
+            "tags": [],
+            "description": "Specifies the unified storage definitions of the workflow. The [storages](#modelartsv2_workflow_storages) structure is documented below.",
+            "details": {
+              "text": "Specifies the unified storage definitions of the workflow. The [storages](#modelartsv2_workflow_storages) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [storages](#modelartsv2_workflow_storages) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "name",
+                "tags": [],
+                "description": "Specifies the name of the workflow storage.",
+                "details": {
+                  "text": "Specifies the name of the workflow storage.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "type",
+                "tags": [],
+                "description": "Specifies the type of the workflow storage.",
+                "details": {
+                  "text": "Specifies the type of the workflow storage.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "path",
+                "tags": [],
+                "description": "Specifies the root path of the unified storage.",
+                "details": {
+                  "text": "Specifies the root path of the unified storage.",
+                  "children": []
+                },
+                "children": []
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_storages"
+          },
+          {
+            "name": "labels",
+            "tags": [],
+            "description": "Specifies the labels of the workflow.",
+            "details": {
+              "text": "Specifies the labels of the workflow.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "assets",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the assets bound to the workflow. The [assets](#modelartsv2_workflow_assets) structure is documented below.",
+            "details": {
+              "text": "Specifies the assets bound to the workflow. The [assets](#modelartsv2_workflow_assets) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [assets](#modelartsv2_workflow_assets) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "name",
+                "tags": [],
+                "description": "Specifies the name of the asset.",
+                "details": {
+                  "text": "Specifies the name of the asset.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "type",
+                "tags": [],
+                "description": "Specifies the type of the asset. Valid values are **algorithm**, **algorithm2**, and **model**.",
+                "details": {
+                  "text": "Specifies the type of the asset. Valid values are **algorithm**, **algorithm2**, and **model**.",
+                  "children": [
+                    {
+                      "text": "Valid values are **algorithm**, **algorithm2**, and **model**.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": []
+              },
+              {
+                "name": "content_id",
+                "tags": [],
+                "description": "Specifies the asset ID.",
+                "details": {
+                  "text": "Specifies the asset ID.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "subscription_id",
+                "tags": [],
+                "description": "Specifies the subscription ID of the asset.",
+                "details": {
+                  "text": "Specifies the subscription ID of the asset.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "expired_at",
+                "tags": [],
+                "description": "Specifies the expiration time of the asset, in RFC3339 format.",
+                "details": {
+                  "text": "Specifies the expiration time of the asset, in RFC3339 format.",
+                  "children": []
+                },
+                "children": []
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_assets"
+          },
+          {
+            "name": "sub_graphs",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the subgraphs of the workflow. The [sub_graphs](#modelartsv2_workflow_sub_graphs) structure is documented below.",
+            "details": {
+              "text": "Specifies the subgraphs of the workflow. The [sub_graphs](#modelartsv2_workflow_sub_graphs) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [sub_graphs](#modelartsv2_workflow_sub_graphs) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "name",
+                "tags": [],
+                "description": "Specifies the name of the subgraph.",
+                "details": {
+                  "text": "Specifies the name of the subgraph.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "steps",
+                "tags": [],
+                "description": "Specifies the step members of the subgraph.",
+                "details": {
+                  "text": "Specifies the step members of the subgraph.",
+                  "children": []
+                },
+                "children": []
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_sub_graphs"
+          },
+          {
+            "name": "extend",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the extended fields of the billing workflow, in JSON format.",
+            "details": {
+              "text": "Specifies the extended fields of the billing workflow, in JSON format.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "policy",
+            "tags": [],
+            "description": "Specifies the partial running policy of the workflow. The [policy](#modelartsv2_workflow_policy) structure is documented below.",
+            "details": {
+              "text": "Specifies the partial running policy of the workflow. The [policy](#modelartsv2_workflow_policy) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [policy](#modelartsv2_workflow_policy) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "use_scene",
+                "tags": [],
+                "description": "Specifies the usage scenario of the workflow policy.",
+                "details": {
+                  "text": "Specifies the usage scenario of the workflow policy.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "scene_id",
+                "tags": [],
+                "description": "Specifies the scene ID of the workflow policy.",
+                "details": {
+                  "text": "Specifies the scene ID of the workflow policy.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "scenes",
+                "tags": [],
+                "description": "Specifies the scenes of the workflow policy. The [scenes](#modelartsv2_workflow_policy_scenes) structure is documented below.",
+                "details": {
+                  "text": "Specifies the scenes of the workflow policy. The [scenes](#modelartsv2_workflow_policy_scenes) structure is documented below.",
+                  "children": [
+                    {
+                      "text": "The [scenes](#modelartsv2_workflow_policy_scenes) structure is documented below.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "id",
+                    "tags": [],
+                    "description": "Specifies the scene ID.",
+                    "details": {
+                      "text": "Specifies the scene ID.",
+                      "children": []
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "name",
+                    "tags": [],
+                    "description": "Specifies the scene name.",
+                    "details": {
+                      "text": "Specifies the scene name.",
+                      "children": []
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "steps",
+                    "tags": [],
+                    "description": "Specifies the step list of the scene.",
+                    "details": {
+                      "text": "Specifies the step list of the scene.",
+                      "children": []
+                    },
+                    "children": []
+                  }
+                ],
+                "anchorId": "modelartsv2_workflow_policy_scenes"
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_policy"
+          },
+          {
+            "name": "with_subscription",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies whether to enable the SMN message subscription of the workflow. Defaults to false.",
+            "details": {
+              "text": "Specifies whether to enable the SMN message subscription of the workflow. Defaults to false.",
+              "children": [
+                {
+                  "text": "the workflow.",
+                  "children": []
+                },
+                {
+                  "text": "Defaults to false.",
+                  "children": []
+                }
+              ]
+            },
+            "children": []
+          },
+          {
+            "name": "smn_switch",
+            "tags": [],
+            "description": "Specifies whether to enable the SMN switch of the workflow.",
+            "details": {
+              "text": "Specifies whether to enable the SMN switch of the workflow.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "subscription_id",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the SMN message subscription ID of the workflow.",
+            "details": {
+              "text": "Specifies the SMN message subscription ID of the workflow.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "exeml_template_id",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the auto learning template ID of the workflow.",
+            "details": {
+              "text": "Specifies the auto learning template ID of the workflow.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "package",
+            "tags": [
+              "NonUpdatable"
+            ],
+            "description": "Specifies the billing workflow subscription package information. The [package](#modelartsv2_workflow_package) structure is documented below.",
+            "details": {
+              "text": "Specifies the billing workflow subscription package information. The [package](#modelartsv2_workflow_package) structure is documented below.",
+              "children": [
+                {
+                  "text": "The [package](#modelartsv2_workflow_package) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": [
+              {
+                "name": "package_id",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the resource package UUID.",
+                "details": {
+                  "text": "Specifies the resource package UUID.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "pool_id",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the resource pool ID.",
+                "details": {
+                  "text": "Specifies the resource pool ID.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "service_id",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the service ID.",
+                "details": {
+                  "text": "Specifies the service ID.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "workflow_id",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the workflow ID.",
+                "details": {
+                  "text": "Specifies the workflow ID.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "order",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the subscription information. The [order](#modelartsv2_workflow_package_order) structure is documented below.",
+                "details": {
+                  "text": "Specifies the subscription information. The [order](#modelartsv2_workflow_package_order) structure is documented below.",
+                  "children": [
+                    {
+                      "text": "The [order](#modelartsv2_workflow_package_order) structure is documented below.",
+                      "children": []
+                    }
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "id",
+                    "tags": [
+                      "NonUpdatable"
+                    ],
+                    "description": "Specifies the subscription ID.",
+                    "details": {
+                      "text": "Specifies the subscription ID.",
+                      "children": []
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "sku",
+                    "tags": [
+                      "NonUpdatable"
+                    ],
+                    "description": "Specifies the subscription billing information. The [sku](#modelartsv2_workflow_package_order_sku) structure is documented below.",
+                    "details": {
+                      "text": "Specifies the subscription billing information. The [sku](#modelartsv2_workflow_package_order_sku) structure is documented below.",
+                      "children": [
+                        {
+                          "text": "The [sku](#modelartsv2_workflow_package_order_sku) structure is documented below.",
+                          "children": []
+                        }
+                      ]
+                    },
+                    "children": [
+                      {
+                        "name": "code",
+                        "tags": [
+                          "NonUpdatable"
+                        ],
+                        "description": "Specifies the billing code.",
+                        "details": {
+                          "text": "Specifies the billing code.",
+                          "children": []
+                        },
+                        "children": []
+                      },
+                      {
+                        "name": "period",
+                        "tags": [
+                          "NonUpdatable"
+                        ],
+                        "description": "Specifies the billing period.",
+                        "details": {
+                          "text": "Specifies the billing period.",
+                          "children": []
+                        },
+                        "children": []
+                      },
+                      {
+                        "name": "queries_limit",
+                        "tags": [
+                          "NonUpdatable"
+                        ],
+                        "description": "Specifies the query limit.",
+                        "details": {
+                          "text": "Specifies the query limit.",
+                          "children": []
+                        },
+                        "children": []
+                      },
+                      {
+                        "name": "price",
+                        "tags": [
+                          "NonUpdatable"
+                        ],
+                        "description": "Specifies the price.",
+                        "details": {
+                          "text": "Specifies the price.",
+                          "children": []
+                        },
+                        "children": []
+                      }
+                    ],
+                    "anchorId": "modelartsv2_workflow_package_order_sku"
+                  },
+                  {
+                    "name": "sku_count",
+                    "tags": [
+                      "NonUpdatable"
+                    ],
+                    "description": "Specifies the subscription count.",
+                    "details": {
+                      "text": "Specifies the subscription count.",
+                      "children": []
+                    },
+                    "children": []
+                  }
+                ],
+                "anchorId": "modelartsv2_workflow_package_order"
+              },
+              {
+                "name": "consume_limit",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the subscription limit.",
+                "details": {
+                  "text": "Specifies the subscription limit.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "current_consume",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the current subscription consumption.",
+                "details": {
+                  "text": "Specifies the current subscription consumption.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "current_date",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies the current date.",
+                "details": {
+                  "text": "Specifies the current date.",
+                  "children": []
+                },
+                "children": []
+              },
+              {
+                "name": "limit_enable",
+                "tags": [
+                  "NonUpdatable"
+                ],
+                "description": "Specifies whether the limit is enabled.",
+                "details": {
+                  "text": "Specifies whether the limit is enabled.",
+                  "children": []
+                },
+                "children": []
+              }
+            ],
+            "anchorId": "modelartsv2_workflow_package"
+          },
+          {
+            "name": "attribute",
+            "tags": [],
+            "description": "Specifies the condition attribute.",
+            "details": {
+              "text": "Specifies the condition attribute.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "operator",
+            "tags": [],
+            "description": "Specifies the operator of the condition.",
+            "details": {
+              "text": "Specifies the operator of the condition.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "value",
+            "tags": [],
+            "description": "Specifies the value of the condition.",
+            "details": {
+              "text": "Specifies the value of the condition.",
+              "children": []
+            },
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "AttributeList",
+      "node": {
+        "title": "Attribute Reference",
+        "description": "In addition to all arguments above, the following attributes are exported:",
+        "attributes": [
+          {
+            "name": "id",
+            "description": "The resource ID.",
+            "details": {
+              "text": "The resource ID.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "steps",
+            "description": "The steps of the workflow.",
+            "details": {
+              "text": "The steps of the workflow.",
+              "children": [
+                {
+                  "text": "The [steps](#modelartsv2_workflow_step_attr) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": []
+          },
+          {
+            "name": "package",
+            "description": "The billing workflow subscription package information.",
+            "details": {
+              "text": "The billing workflow subscription package information.",
+              "children": [
+                {
+                  "text": "The [package](#modelartsv2_workflow_package_attr) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": []
+          },
+          {
+            "name": "created_at",
+            "description": "The creation time of the workflow, in RFC3339 format.",
+            "details": {
+              "text": "The creation time of the workflow, in RFC3339 format.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "user_name",
+            "description": "The user name that created the workflow.",
+            "details": {
+              "text": "The user name that created the workflow.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "latest_execution",
+            "description": "The latest execution information of the workflow.",
+            "details": {
+              "text": "The latest execution information of the workflow.",
+              "children": [
+                {
+                  "text": "The [latest_execution](#modelartsv2_workflow_latest_execution_attr) structure is documented below.",
+                  "children": []
+                }
+              ]
+            },
+            "children": []
+          },
+          {
+            "name": "run_count",
+            "description": "The number of times the workflow has been run.",
+            "details": {
+              "text": "The number of times the workflow has been run.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "param_ready",
+            "description": "Whether all required parameters of the workflow are filled in.",
+            "details": {
+              "text": "Whether all required parameters of the workflow are filled in.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "source",
+            "description": "The source of the workflow.",
+            "details": {
+              "text": "The source of the workflow.",
+              "children": []
+            },
+            "children": []
+          },
+          {
+            "name": "last_modified_at",
+            "description": "The last modified time of the workflow, in RFC3339 format.",
+            "details": {
+              "text": "The last modified time of the workflow, in RFC3339 format.",
+              "children": []
+            },
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "Import",
+      "node": {
+        "hasImportBlock": true,
+        "importIdPattern": "<id>"
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "level": "warning",
+      "code": "DOC_ATTRIBUTE_BULLET_PARSE_FAIL",
+      "message": "Attribute bullet parse failed: * 'created_at' - The creation time of the step, in RFC3339 format."
+    },
+    {
+      "level": "warning",
+      "code": "DOC_ATTRIBUTE_BULLET_PARSE_FAIL",
+      "message": "Attribute bullet parse failed: * 'status' - The status of the package."
+    },
+    {
+      "level": "warning",
+      "code": "DOC_ATTRIBUTE_BULLET_PARSE_FAIL",
+      "message": "Attribute bullet parse failed: * 'created_at' - The creation time of the package, in RFC3339 format."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { Rule, RuleCheckResult, type RuleMeta } from "../../../../../types/rule/rule";
 import type { Context } from "../../../../../context/context";
 import type { SchemaSemanticView, SemanticField } from "../../../types";
-import type { Argument, DocSemanticView } from "../../../tools/doc-semantic";
+import type { ArgumentNode, DocSemanticView } from "../../../tools/doc-semantic";
 import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../../context-keys";
 
 const META: RuleMeta = {
@@ -100,7 +100,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkOrdering(
-        docArgs: Argument[],
+        docArgs: ArgumentNode[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -151,7 +151,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkTagAlignment(
-        docArgs: Argument[],
+        docArgs: ArgumentNode[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -193,7 +193,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkDescriptionAlignment(
-        docArgs: Argument[],
+        docArgs: ArgumentNode[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -224,7 +224,7 @@ export class ArgumentSectionSemanticRule extends Rule {
             }
 
             this.checkNestedDescriptionAlignment(
-                arg.arguments,
+                arg.children,
                 field.subFields ?? [],
                 arg.name,
                 failures,
@@ -233,7 +233,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkCompleteness(
-        docArgs: Argument[],
+        docArgs: ArgumentNode[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -266,7 +266,7 @@ export class ArgumentSectionSemanticRule extends Rule {
             const schemaField = view.arguments.get(arg.name);
             if (schemaField) {
                 this.checkNestedCompleteness(
-                    arg.arguments,
+                    arg.children,
                     schemaField.subFields ?? [],
                     arg.name,
                     failures,
@@ -276,7 +276,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkNestedCompleteness(
-        docArgs: Argument[],
+        docArgs: ArgumentNode[],
         schemaSubFields: SemanticField[],
         path: string,
         failures: RuleCheckResult[],
@@ -311,7 +311,7 @@ export class ArgumentSectionSemanticRule extends Rule {
             }
 
             this.checkNestedCompleteness(
-                arg.arguments,
+                arg.children,
                 schemaField.subFields ?? [],
                 `${path} > ${arg.name}`,
                 failures,
@@ -320,7 +320,7 @@ export class ArgumentSectionSemanticRule extends Rule {
     }
 
     private checkNestedDescriptionAlignment(
-        docArgs: Argument[],
+        docArgs: ArgumentNode[],
         schemaSubFields: SemanticField[],
         path: string,
         failures: RuleCheckResult[],
@@ -354,7 +354,7 @@ export class ArgumentSectionSemanticRule extends Rule {
             }
 
             this.checkNestedDescriptionAlignment(
-                arg.arguments,
+                arg.children,
                 schemaField.subFields ?? [],
                 `${path} > ${arg.name}`,
                 failures,
@@ -368,6 +368,6 @@ function lowercaseFirst(s: string): string {
     return s[0].toLowerCase() + s.slice(1);
 }
 
-function getStartLine(arg: Argument): number | undefined {
+function getStartLine(arg: ArgumentNode): number | undefined {
     return arg.sourceRange?.start.line;
 }

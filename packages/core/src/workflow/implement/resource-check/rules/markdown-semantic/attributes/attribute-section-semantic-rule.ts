@@ -1,7 +1,7 @@
 import { Rule, RuleCheckResult, type RuleMeta } from "../../../../../types/rule/rule";
 import type { Context } from "../../../../../context/context";
 import type { SchemaSemanticView, SemanticField } from "../../../types";
-import type { Attribute, DocSemanticView } from "../../../tools/doc-semantic";
+import type { AttributeNode, DocSemanticView } from "../../../tools/doc-semantic";
 import { CTX_SCHEMA_SEMANTIC_VIEW, CTX_DOC_SEMANTIC_VIEW } from "../../../context-keys";
 
 const META: RuleMeta = {
@@ -79,7 +79,7 @@ export class AttributeSectionSemanticRule extends Rule {
     }
 
     private checkCompleteness(
-        docAttrs: Attribute[],
+        docAttrs: AttributeNode[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -111,7 +111,7 @@ export class AttributeSectionSemanticRule extends Rule {
             const schemaField = view.attributes.get(attr.name);
             if (schemaField) {
                 this.checkNestedCompleteness(
-                    attr.attributes,
+                    attr.children,
                     schemaField.subFields ?? [],
                     attr.name,
                     failures,
@@ -121,7 +121,7 @@ export class AttributeSectionSemanticRule extends Rule {
     }
 
     private checkDescriptionAlignment(
-        docAttrs: Attribute[],
+        docAttrs: AttributeNode[],
         view: SchemaSemanticView,
         failures: RuleCheckResult[],
     ): void {
@@ -152,7 +152,7 @@ export class AttributeSectionSemanticRule extends Rule {
             }
 
             this.checkNestedDescriptionAlignment(
-                attr.attributes,
+                attr.children,
                 field.subFields ?? [],
                 attr.name,
                 failures,
@@ -161,7 +161,7 @@ export class AttributeSectionSemanticRule extends Rule {
     }
 
     private checkNestedCompleteness(
-        docAttrs: Attribute[],
+        docAttrs: AttributeNode[],
         schemaSubFields: SemanticField[],
         path: string,
         failures: RuleCheckResult[],
@@ -196,7 +196,7 @@ export class AttributeSectionSemanticRule extends Rule {
             }
 
             this.checkNestedCompleteness(
-                attr.attributes,
+                attr.children,
                 schemaField.subFields ?? [],
                 `${path} > ${attr.name}`,
                 failures,
@@ -205,7 +205,7 @@ export class AttributeSectionSemanticRule extends Rule {
     }
 
     private checkNestedDescriptionAlignment(
-        docAttrs: Attribute[],
+        docAttrs: AttributeNode[],
         schemaSubFields: SemanticField[],
         path: string,
         failures: RuleCheckResult[],
@@ -239,7 +239,7 @@ export class AttributeSectionSemanticRule extends Rule {
             }
 
             this.checkNestedDescriptionAlignment(
-                attr.attributes,
+                attr.children,
                 schemaField.subFields ?? [],
                 `${path} > ${attr.name}`,
                 failures,
@@ -248,6 +248,6 @@ export class AttributeSectionSemanticRule extends Rule {
     }
 }
 
-function getStartLine(attr: Attribute): number | undefined {
+function getStartLine(attr: AttributeNode): number | undefined {
     return attr.sourceRange?.start.line;
 }

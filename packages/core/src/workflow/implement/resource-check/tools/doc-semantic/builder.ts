@@ -1,4 +1,3 @@
-import { ar } from "zod/v4/locales";
 import {
     MarkdownParser,
     type MarkdownNode,
@@ -13,9 +12,11 @@ import {
     csvParenthesized,
 } from "../../../../../tools/line-pattern";
 import type {
-    Argument,
+    ArgumentNode,
+    ArgumentBlock,
     ArgumentList,
-    Attribute,
+    AttributeNode,
+    AttributeBlock,
     AttributeList,
     BuildDiagnostic,
     DocBlock,
@@ -219,26 +220,8 @@ export function buildArgumentList(
     if (!section) return null;
 
     const description = extractSectionDescription(parser, section);
-    const collected = collectSectionItems(
-        parser,
-        source,
-        section,
-        diagnostics,
-        parseArgumentItemsFromList,
-    );
-    const args = collected.topLevelItems;
-
-    for (const nested of collected.nestedGroups) {
-        const attached = attachNestedArguments(args, nested.parentName, nested.items);
-        if (!attached) {
-            diagnostics.push({
-                level: "warning",
-                code: "DOC_ARGUMENT_NESTED_PARENT_NOT_FOUND",
-                message: `Nested argument block parent not found: ${nested.parentName}`,
-                sourceRange: nested.sourceRange,
-            });
-        }
-    }
+    const blocks = collectArgumentBlocks(parser, source, section, diagnostics);
+    const args = buildArgumentTree(blocks, diagnostics);
 
     return toBlockView<ArgumentList>(
         "ArgumentList",
@@ -266,26 +249,8 @@ export function buildAttributeList(
     if (!sectionInfo) return null;
 
     const description = extractSectionDescription(parser, sectionInfo.nodes);
-    const collected = collectSectionItems(
-        parser,
-        source,
-        sectionInfo.nodes,
-        diagnostics,
-        parseAttributeItemsFromList,
-    );
-    const attrs = collected.topLevelItems;
-
-    for (const nested of collected.nestedGroups) {
-        const attached = attachNestedAttributes(attrs, nested.parentName, nested.items);
-        if (!attached) {
-            diagnostics.push({
-                level: "warning",
-                code: "DOC_ATTRIBUTE_NESTED_PARENT_NOT_FOUND",
-                message: `Nested attribute block parent not found: ${nested.parentName}`,
-                sourceRange: nested.sourceRange,
-            });
-        }
-    }
+    const blocks = collectAttributeBlocks(parser, source, sectionInfo.nodes, diagnostics);
+    const attrs = buildAttributeTree(blocks, diagnostics);
 
     return toBlockView<AttributeList>(
         "AttributeList",
@@ -381,9 +346,9 @@ function parseArgumentItemsFromList(
     source: string,
     listNode: MarkdownNode,
     diagnostics: BuildDiagnostic[],
-): Argument[] {
+): ArgumentNode[] {
     const items = parser.getBulletItems([listNode]);
-    const result: Argument[] = [];
+    const result: ArgumentNode[] = [];
 
     for (const item of items) {
         const bullet = parser.getItemBulletLine(source, item);
@@ -408,12 +373,16 @@ function parseArgumentItemsFromList(
             parsed.description,
         );
 
+        const allLogicalText = parser.getLogicalLines(source, item)?.lines.join(" ") ?? fullDescription;
+        const anchorId = extractAnchorIdFromLink(allLogicalText);
+
         result.push({
             name: parsed.name,
             tags: parsed.tags,
             description: fullDescription,
             details: buildItemDetailsTree(parser, source, item, fullDescription),
-            arguments: [],
+            children: [],
+            anchorId,
             sourceRange: item.sourceRange ?? undefined,
         });
     }
@@ -426,9 +395,9 @@ function parseAttributeItemsFromList(
     source: string,
     listNode: MarkdownNode,
     diagnostics: BuildDiagnostic[],
-): Attribute[] {
+): AttributeNode[] {
     const items = parser.getBulletItems([listNode]);
-    const result: Attribute[] = [];
+    const result: AttributeNode[] = [];
 
     for (const item of items) {
         const bullet = parser.getItemBulletLine(source, item);
@@ -453,11 +422,15 @@ function parseAttributeItemsFromList(
             parsed.description,
         );
 
+        const allLogicalText = parser.getLogicalLines(source, item)?.lines.join(" ") ?? fullDescription;
+        const anchorId = extractAnchorIdFromLink(allLogicalText);
+
         result.push({
             name: parsed.name,
             description: fullDescription,
             details: buildItemDetailsTree(parser, source, item, fullDescription),
-            attributes: [],
+            children: [],
+            anchorId,
             sourceRange: item.sourceRange ?? undefined,
         });
     }
@@ -557,126 +530,286 @@ function buildItemDetailsTree(
     };
 }
 
-function hasComputedArgument(args: Argument[]): boolean {
+function hasComputedArgument(args: ArgumentNode[]): boolean {
     for (const arg of args) {
         if (arg.tags.some((t) => t.toLowerCase() === "computed")) {
             return true;
         }
-        if (hasComputedArgument(arg.arguments)) {
+        if (hasComputedArgument(arg.children)) {
             return true;
         }
     }
     return false;
 }
 
-interface CollectedSectionItems<T> {
-    topLevelItems: T[];
-    nestedGroups: Array<{
-        parentName: string;
-        items: T[];
-        sourceRange?: SourceRange;
-    }>;
+function extractAnchorIdFromHtml(nodes: MarkdownNode[]): string | undefined {
+    for (const node of nodes) {
+        if (node.type === "html_block" || node.type === "html_inline") {
+            const match = node.literal?.match(/<a\s+name="([^"]+)"/);
+            if (match) return match[1];
+        }
+        if (node.children?.length) {
+            const found = extractAnchorIdFromHtml(node.children);
+            if (found) return found;
+        }
+    }
+    return undefined;
 }
 
-function collectSectionItems<T>(
+function extractAnchorIdFromLink(text: string): string | undefined {
+    const match = text.match(/\[([^\]]+)\]\(#([^)]+)\)\s+structure is documented below/i);
+    return match?.[2];
+}
+
+function preScanAnchors(section: MarkdownNode[]): Map<number, string> {
+    const anchorMap = new Map<number, string>();
+    for (let i = 0; i < section.length; i++) {
+        const node = section[i];
+        const anchorId = extractAnchorIdFromHtml([node]);
+        if (anchorId) {
+            anchorMap.set(i, anchorId);
+        }
+        if (node.type === "paragraph" && node.children?.length) {
+            const inlineAnchor = extractAnchorIdFromHtml(node.children);
+            if (inlineAnchor) {
+                anchorMap.set(i, inlineAnchor);
+            }
+        }
+    }
+    return anchorMap;
+}
+
+function parseSupportBlockDeclaration(text: string): { paramName: string } | null {
+    const backtickMatch = text.match(/The\s+`([^`]+)`\s+block supports:/i);
+    if (backtickMatch) return { paramName: stripBackticks(backtickMatch[1]) };
+
+    const linkMatch = text.match(/The\s+\[([^\]]+)\]\(#[^)]+\)\s+block supports:/i);
+    if (linkMatch) return { paramName: stripBackticks(linkMatch[1]) };
+
+    const plainMatch = text.match(/The\s+([a-zA-Z0-9_]+)\s+block supports:/i);
+    if (plainMatch) return { paramName: plainMatch[1] };
+
+    return null;
+}
+
+function collectArgumentBlocks(
     parser: MarkdownParser,
     source: string,
     section: MarkdownNode[],
     diagnostics: BuildDiagnostic[],
-    parseListItems: (
-        parser: MarkdownParser,
-        source: string,
-        listNode: MarkdownNode,
-        diagnostics: BuildDiagnostic[],
-    ) => T[],
-): CollectedSectionItems<T> {
-    const topLevelItems: T[] = [];
-    const nestedGroups: CollectedSectionItems<T>["nestedGroups"] = [];
-    let currentTarget = topLevelItems;
+): ArgumentBlock[] {
+    const anchorMap = preScanAnchors(section);
+    const blocks: ArgumentBlock[] = [];
 
-    for (const node of section) {
+    const rootBlock: ArgumentBlock = {
+        anchorId: "__root__",
+        paramName: "",
+        nodes: [],
+    };
+    blocks.push(rootBlock);
+
+    let currentBlock = rootBlock;
+
+    for (let i = 0; i < section.length; i++) {
+        const node = section[i];
+
         if (node.type === "list") {
-            currentTarget.push(
-                ...parseListItems(parser, source, node, diagnostics),
-            );
+            const items = parseArgumentItemsFromList(parser, source, node, diagnostics);
+            currentBlock.nodes.push(...items);
             continue;
         }
 
         if (node.type === "paragraph") {
             const text = parser.getTextContent(node).trim();
-            const parentName = parseSupportBlockName(text);
-            if (parentName) {
-                const group = {
-                    parentName,
-                    items: [] as T[],
+            const blockDecl = parseSupportBlockDeclaration(text);
+            if (blockDecl) {
+                const anchorId = anchorMap.get(i) ?? blockDecl.paramName;
+                const newBlock: ArgumentBlock = {
+                    anchorId,
+                    paramName: blockDecl.paramName,
+                    parentAnchorId: undefined,
+                    nodes: [],
                     sourceRange: node.sourceRange ?? undefined,
                 };
-                nestedGroups.push(group);
-                currentTarget = group.items;
+                blocks.push(newBlock);
+                currentBlock = newBlock;
                 continue;
             }
+
+            currentBlock = rootBlock;
+            continue;
         }
 
-        // Skip unrelated nodes (for example notes and html_block).
-        //
-        // We intentionally do not special-case html_block here:
-        // - If `<a name="..."></a>` is adjacent to `The \`xxx\` block supports:`,
-        //   CommonMark usually keeps both lines in one paragraph, where the
-        //   anchor is an html_inline child and parentName is still detectable.
-        // - If there is a blank line between anchor and supports text, the
-        //   anchor becomes an html_block, which has no supports semantic and is
-        //   naturally skipped; the following supports paragraph will switch
-        //   context correctly.
+        if (node.type === "html_block") {
+            continue;
+        }
+
+        currentBlock = rootBlock;
     }
 
-    return { topLevelItems, nestedGroups };
-}
+    const anchorToBlock = new Map<string, ArgumentBlock>();
+    for (const block of blocks) {
+        anchorToBlock.set(block.anchorId, block);
+    }
 
-function parseSupportBlockName(text: string): string | null {
-    const backtickMatch = text.match(/The\s+`([^`]+)`\s+block supports:/i);
-    if (backtickMatch) return backtickMatch[1];
-
-    const linkMatch = text.match(/The\s+\[([^\]]+)\]\(#[^)]+\)\s+structure is documented below\./i);
-    if (linkMatch) return linkMatch[1];
-
-    const plainMatch = text.match(/The\s+([a-zA-Z0-9_]+)\s+block supports:/i);
-    if (plainMatch) return plainMatch[1];
-
-    return null;
-}
-
-function attachNestedArguments(
-    args: Argument[],
-    parentName: string,
-    nested: Argument[],
-): boolean {
-    for (const arg of args) {
-        if (arg.name === parentName) {
-            arg.arguments = nested;
-            return true;
-        }
-        if (attachNestedArguments(arg.arguments, parentName, nested)) {
-            return true;
+    for (const block of blocks) {
+        for (const item of block.nodes) {
+            if (item.anchorId) {
+                const childBlock = anchorToBlock.get(item.anchorId);
+                if (childBlock) {
+                    childBlock.parentAnchorId = block.anchorId;
+                }
+            }
         }
     }
-    return false;
+
+    return blocks;
 }
 
-function attachNestedAttributes(
-    attrs: Attribute[],
-    parentName: string,
-    nested: Attribute[],
-): boolean {
-    for (const attr of attrs) {
-        if (attr.name === parentName) {
-            attr.attributes = nested;
-            return true;
+function collectAttributeBlocks(
+    parser: MarkdownParser,
+    source: string,
+    section: MarkdownNode[],
+    diagnostics: BuildDiagnostic[],
+): AttributeBlock[] {
+    const anchorMap = preScanAnchors(section);
+    const blocks: AttributeBlock[] = [];
+
+    const rootBlock: AttributeBlock = {
+        anchorId: "__root__",
+        paramName: "",
+        nodes: [],
+    };
+    blocks.push(rootBlock);
+
+    let currentBlock = rootBlock;
+
+    for (let i = 0; i < section.length; i++) {
+        const node = section[i];
+
+        if (node.type === "list") {
+            const items = parseAttributeItemsFromList(parser, source, node, diagnostics);
+            currentBlock.nodes.push(...items);
+            continue;
         }
-        if (attachNestedAttributes(attr.attributes, parentName, nested)) {
-            return true;
+
+        if (node.type === "paragraph") {
+            const text = parser.getTextContent(node).trim();
+            const blockDecl = parseSupportBlockDeclaration(text);
+            if (blockDecl) {
+                const anchorId = anchorMap.get(i) ?? blockDecl.paramName;
+                const newBlock: AttributeBlock = {
+                    anchorId,
+                    paramName: blockDecl.paramName,
+                    parentAnchorId: undefined,
+                    nodes: [],
+                    sourceRange: node.sourceRange ?? undefined,
+                };
+                blocks.push(newBlock);
+                currentBlock = newBlock;
+                continue;
+            }
+
+            currentBlock = rootBlock;
+            continue;
+        }
+
+        if (node.type === "html_block") {
+            continue;
+        }
+
+        currentBlock = rootBlock;
+    }
+
+    const anchorToBlock = new Map<string, AttributeBlock>();
+    for (const block of blocks) {
+        anchorToBlock.set(block.anchorId, block);
+    }
+
+    for (const block of blocks) {
+        for (const item of block.nodes) {
+            if (item.anchorId) {
+                const childBlock = anchorToBlock.get(item.anchorId);
+                if (childBlock) {
+                    childBlock.parentAnchorId = block.anchorId;
+                }
+            }
         }
     }
-    return false;
+
+    return blocks;
+}
+
+function buildArgumentTree(
+    blocks: ArgumentBlock[],
+    diagnostics: BuildDiagnostic[],
+): ArgumentNode[] {
+    const anchorToBlock = new Map<string, ArgumentBlock>();
+    for (const block of blocks) {
+        anchorToBlock.set(block.anchorId, block);
+    }
+
+    const rootBlock = blocks.find((b) => b.anchorId === "__root__");
+    if (!rootBlock) return [];
+
+    function attachChildren(block: ArgumentBlock): void {
+        for (const childBlock of blocks) {
+            if (childBlock.parentAnchorId === block.anchorId) {
+                const parentItem = block.nodes.find((n) => n.anchorId === childBlock.anchorId);
+                if (parentItem) {
+                    parentItem.children = childBlock.nodes;
+                    attachChildren(childBlock);
+                } else {
+                    diagnostics.push({
+                        level: "warning",
+                        code: "DOC_ARGUMENT_NESTED_PARENT_NOT_FOUND",
+                        message: `Nested argument block parent not found for anchor: ${childBlock.anchorId}`,
+                        sourceRange: childBlock.sourceRange,
+                    });
+                }
+            }
+        }
+    }
+
+    attachChildren(rootBlock);
+
+    return rootBlock.nodes;
+}
+
+function buildAttributeTree(
+    blocks: AttributeBlock[],
+    diagnostics: BuildDiagnostic[],
+): AttributeNode[] {
+    const anchorToBlock = new Map<string, AttributeBlock>();
+    for (const block of blocks) {
+        anchorToBlock.set(block.anchorId, block);
+    }
+
+    const rootBlock = blocks.find((b) => b.anchorId === "__root__");
+    if (!rootBlock) return [];
+
+    function attachChildren(block: AttributeBlock): void {
+        for (const childBlock of blocks) {
+            if (childBlock.parentAnchorId === block.anchorId) {
+                const parentItem = block.nodes.find((n) => n.anchorId === childBlock.anchorId);
+                if (parentItem) {
+                    parentItem.children = childBlock.nodes;
+                    attachChildren(childBlock);
+                } else {
+                    diagnostics.push({
+                        level: "warning",
+                        code: "DOC_ATTRIBUTE_NESTED_PARENT_NOT_FOUND",
+                        message: `Nested attribute block parent not found for anchor: ${childBlock.anchorId}`,
+                        sourceRange: childBlock.sourceRange,
+                    });
+                }
+            }
+        }
+    }
+
+    attachChildren(rootBlock);
+
+    return rootBlock.nodes;
 }
 
 function extractImportIdPattern(code: string): string | undefined {
