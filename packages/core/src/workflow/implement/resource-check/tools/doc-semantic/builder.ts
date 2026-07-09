@@ -627,7 +627,6 @@ function collectArgumentBlocks(
                 const newBlock: ArgumentBlock = {
                     anchorId,
                     paramName: blockDecl.paramName,
-                    parentAnchorId: undefined,
                     nodes: [],
                     sourceRange: node.sourceRange ?? undefined,
                 };
@@ -645,22 +644,6 @@ function collectArgumentBlocks(
         }
 
         currentBlock = rootBlock;
-    }
-
-    const anchorToBlock = new Map<string, ArgumentBlock>();
-    for (const block of blocks) {
-        anchorToBlock.set(block.anchorId, block);
-    }
-
-    for (const block of blocks) {
-        for (const item of block.nodes) {
-            if (item.anchorId) {
-                const childBlock = anchorToBlock.get(item.anchorId);
-                if (childBlock) {
-                    childBlock.parentAnchorId = block.anchorId;
-                }
-            }
-        }
     }
 
     return blocks;
@@ -701,7 +684,6 @@ function collectAttributeBlocks(
                 const newBlock: AttributeBlock = {
                     anchorId,
                     paramName: blockDecl.paramName,
-                    parentAnchorId: undefined,
                     nodes: [],
                     sourceRange: node.sourceRange ?? undefined,
                 };
@@ -721,95 +703,133 @@ function collectAttributeBlocks(
         currentBlock = rootBlock;
     }
 
-    const anchorToBlock = new Map<string, AttributeBlock>();
-    for (const block of blocks) {
-        anchorToBlock.set(block.anchorId, block);
-    }
+    return blocks;
+}
+
+interface NestedTreeItem {
+    name: string;
+    anchorId?: string;
+    children: NestedTreeItem[];
+}
+
+interface NestedTreeBlock<TNode extends NestedTreeItem> {
+    anchorId: string;
+    paramName: string;
+    nodes: TNode[];
+    sourceRange?: SourceRange;
+}
+
+/**
+ * Build a nested argument/attribute tree from collected blocks.
+ *
+ * Resolution is item-driven: each item that references a sub-structure (via an
+ * anchor link or simply by name) is matched to the block documenting it. Unlike
+ * a strict single-parent anchor linkage, this allows one documented block to be
+ * shared by several parent items (a common Terraform-docs pattern), and is
+ * resilient to `<a name>` anchor typos.
+ *
+ * Matching priority per item:
+ *  1. Unambiguous paramName match — the "The `X` block supports:" declaration
+ *     is bound to the block content, so `block.paramName === item.name` is the
+ *     most reliable signal (only used when exactly one block has that name).
+ *  2. Anchor-id match — `item.anchorId === block.anchorId` (from `<a name>`).
+ */
+function buildNestedTree<TNode extends NestedTreeItem>(
+    blocks: NestedTreeBlock<TNode>[],
+    orphanCode: string,
+    orphanLabel: string,
+    diagnostics: BuildDiagnostic[],
+): TNode[] {
+    const rootBlock = blocks.find((b) => b.anchorId === "__root__");
+    if (!rootBlock) return [];
+
+    const byAnchor = new Map<string, NestedTreeBlock<TNode>>();
+    const byParamName = new Map<string, NestedTreeBlock<TNode>>();
+    const paramNameCounts = new Map<string, number>();
 
     for (const block of blocks) {
-        for (const item of block.nodes) {
-            if (item.anchorId) {
-                const childBlock = anchorToBlock.get(item.anchorId);
-                if (childBlock) {
-                    childBlock.parentAnchorId = block.anchorId;
-                }
+        if (block.anchorId === "__root__") continue;
+        if (block.anchorId && !byAnchor.has(block.anchorId)) {
+            byAnchor.set(block.anchorId, block);
+        }
+        if (block.paramName) {
+            paramNameCounts.set(
+                block.paramName,
+                (paramNameCounts.get(block.paramName) ?? 0) + 1,
+            );
+            if (!byParamName.has(block.paramName)) {
+                byParamName.set(block.paramName, block);
             }
         }
     }
 
-    return blocks;
+    const resolved = new Set<NestedTreeBlock<TNode>>();
+    const visiting = new Set<NestedTreeBlock<TNode>>();
+
+    function resolveChildBlock(item: TNode): NestedTreeBlock<TNode> | undefined {
+        if (item.name && paramNameCounts.get(item.name) === 1) {
+            return byParamName.get(item.name);
+        }
+        if (item.anchorId) {
+            return byAnchor.get(item.anchorId);
+        }
+        return undefined;
+    }
+
+    function attachChildren(block: NestedTreeBlock<TNode>): void {
+        for (const item of block.nodes) {
+            const childBlock = resolveChildBlock(item);
+            if (!childBlock) continue;
+            // Share the documented sub-nodes with every referencing parent so a
+            // single block can serve multiple parent arguments/attributes.
+            item.children = childBlock.nodes as TNode[];
+            resolved.add(childBlock);
+            if (visiting.has(childBlock)) continue; // cycle guard
+            visiting.add(childBlock);
+            attachChildren(childBlock);
+            visiting.delete(childBlock);
+        }
+    }
+
+    attachChildren(rootBlock);
+
+    for (const block of blocks) {
+        if (block.anchorId === "__root__") continue;
+        if (!resolved.has(block)) {
+            diagnostics.push({
+                level: "warning",
+                code: orphanCode,
+                message: `${orphanLabel} parent not found for anchor: ${block.anchorId}`,
+                sourceRange: block.sourceRange,
+            });
+        }
+    }
+
+    return rootBlock.nodes;
 }
 
 function buildArgumentTree(
     blocks: ArgumentBlock[],
     diagnostics: BuildDiagnostic[],
 ): ArgumentNode[] {
-    const anchorToBlock = new Map<string, ArgumentBlock>();
-    for (const block of blocks) {
-        anchorToBlock.set(block.anchorId, block);
-    }
-
-    const rootBlock = blocks.find((b) => b.anchorId === "__root__");
-    if (!rootBlock) return [];
-
-    function attachChildren(block: ArgumentBlock): void {
-        for (const childBlock of blocks) {
-            if (childBlock.parentAnchorId === block.anchorId) {
-                const parentItem = block.nodes.find((n) => n.anchorId === childBlock.anchorId);
-                if (parentItem) {
-                    parentItem.children = childBlock.nodes;
-                    attachChildren(childBlock);
-                } else {
-                    diagnostics.push({
-                        level: "warning",
-                        code: "DOC_ARGUMENT_NESTED_PARENT_NOT_FOUND",
-                        message: `Nested argument block parent not found for anchor: ${childBlock.anchorId}`,
-                        sourceRange: childBlock.sourceRange,
-                    });
-                }
-            }
-        }
-    }
-
-    attachChildren(rootBlock);
-
-    return rootBlock.nodes;
+    return buildNestedTree<ArgumentNode>(
+        blocks,
+        "DOC_ARGUMENT_NESTED_PARENT_NOT_FOUND",
+        "Nested argument block",
+        diagnostics,
+    );
 }
 
 function buildAttributeTree(
     blocks: AttributeBlock[],
     diagnostics: BuildDiagnostic[],
 ): AttributeNode[] {
-    const anchorToBlock = new Map<string, AttributeBlock>();
-    for (const block of blocks) {
-        anchorToBlock.set(block.anchorId, block);
-    }
-
-    const rootBlock = blocks.find((b) => b.anchorId === "__root__");
-    if (!rootBlock) return [];
-
-    function attachChildren(block: AttributeBlock): void {
-        for (const childBlock of blocks) {
-            if (childBlock.parentAnchorId === block.anchorId) {
-                const parentItem = block.nodes.find((n) => n.anchorId === childBlock.anchorId);
-                if (parentItem) {
-                    parentItem.children = childBlock.nodes;
-                    attachChildren(childBlock);
-                } else {
-                    diagnostics.push({
-                        level: "warning",
-                        code: "DOC_ATTRIBUTE_NESTED_PARENT_NOT_FOUND",
-                        message: `Nested attribute block parent not found for anchor: ${childBlock.anchorId}`,
-                        sourceRange: childBlock.sourceRange,
-                    });
-                }
-            }
-        }
-    }
-
-    attachChildren(rootBlock);
-
-    return rootBlock.nodes;
+    return buildNestedTree<AttributeNode>(
+        blocks,
+        "DOC_ATTRIBUTE_NESTED_PARENT_NOT_FOUND",
+        "Nested attribute block",
+        diagnostics,
+    );
 }
 
 function extractImportIdPattern(code: string): string | undefined {

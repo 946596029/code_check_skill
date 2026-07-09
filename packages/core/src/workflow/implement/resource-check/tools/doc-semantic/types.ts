@@ -57,7 +57,6 @@ export interface ArgumentNode {
 export interface ArgumentBlock {
     anchorId: string;
     paramName: string;
-    parentAnchorId?: string;
     nodes: ArgumentNode[];
     sourceRange?: SourceRange;
 }
@@ -82,7 +81,6 @@ export interface AttributeNode {
 export interface AttributeBlock {
     anchorId: string;
     paramName: string;
-    parentAnchorId?: string;
     nodes: AttributeNode[];
     sourceRange?: SourceRange;
 }
